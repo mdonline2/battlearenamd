@@ -1,0 +1,2907 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>0.07prokectDW(戰棋版・第一階段)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink-night:#10121B; --panel:#181B27; --panel-2:#1F2333; --border:#2C3145;
+  --gold:#C9A227; --gold-bright:#E4C34F; --text:#E7E4DA; --text-dim:#9A9CAE;
+  --hp:#c14b4b; --hp-low:#e2604a; --ally:#3E8E82; --enemy:#C2542E;
+  /* 裝備部位標籤色（色票先暫定，之後想改直接換這幾個hex即可）*/
+  --eq-head:#8a95a5; --eq-chest:#b8763f; --eq-hands:#a8895f;
+  --eq-waist:#7c9b6f; --eq-feet:#6f8a7c; --eq-acc:#a67cc4;
+  /* 屬性八宮格色票（暫定，之後想改直接換這幾個hex即可）*/
+  --attr-lv:#C9A227; --attr-sp:#6f8fc4; --attr-atk:#c47a4f; --attr-def:#6fae95;
+}
+*{box-sizing:border-box;}
+html,body{
+  margin:0;padding:0;background:var(--ink-night);color:var(--text);
+  font-family:'Inter',-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
+  /*
+    display: flex; flex-direction: column; align-items: center;
+    padding: 16px;
+    這邊影響畫面縮放
+    */
+}
+
+  h1 { font-size: 16px; color: var(--text-dim); margin: 4px 0 12px; font-weight: normal; }
+  .note { font-size: 12px; color: var(--text-dim); max-width: 640px; text-align: center; margin-bottom: 12px; line-height: 1.8; }
+  .note b { color: var(--gold-bright); }
+
+  .stage {
+    position: relative;
+    width: 640px; height: 360px;
+    background: var(--panel); /* 主檔案戰鬥背景是 .battle-bg 疊圖+filter，這裡demo還沒接背景圖，先用單色面板色 */
+    overflow: hidden;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+  .bg-label {
+    position: absolute; top: 8px; left: 10px; z-index: 1;
+    font-size: 11px; color: var(--text-dim);
+  }
+
+
+.serif{font-family:'Spectral',Georgia,serif;}
+.slot{ position:relative; }
+/* ============================================================
+   🔧 裝備部位顏色標記（小圓點）位置/大小怎麼調
+   - 這個小圓點是靠 .slot 設定 position:relative 當定位基準，
+     .slot-tagdot 用 position:absolute 相對於.slot的右上角定位
+   - 想移動位置：改下面 top / right 這兩個數字（單位px，數字越大離邊角越遠）
+   - 想改大小：改 width / height（兩個要一起改，保持正圓形）
+   - 想改顏色：不要改這裡，去最上面 :root{} 裡改 --eq-head/--eq-chest/
+     --eq-hands/--eq-waist/--eq-feet/--eq-acc 這幾個hex色碼即可
+============================================================ */
+.slot-tagdot{ position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%; }
+/* ============================================================
+   🔧 卡片左側顏色條（比照原本屬性卡.attrcard的做法，統一套到所有.slot卡片上）
+   - 條的顏色吃每張卡自己inline style設定的 --accent 變數（跟.slot-tagdot共用同一個顏色值即可）
+   - 沒有設定--accent的卡片（目前是道具卡，ITEM_DB還沒有分類/顏色資料）會fallback顯示--border，
+     視覺上等於沒有特別標色，之後道具補上分類欄位後再接上即可
+   - 想改粗細：改width（目前3px，跟舊.attrcard一樣）；想改要不要圓角：改border-radius
+============================================================ */
+.slot::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:3px; border-radius:10px 0 0 10px; background:var(--accent, var(--border)); }
+.app{
+
+  max-width:1200px;margin:0 auto;padding:16px 14px 60px;
+
+}
+button{font-family:inherit;cursor:pointer;border:none;}
+.btn{background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;}
+.btn:hover{border-color:#454b66;}
+.btn:active{transform:scale(.97);}
+.btn.primary{background:var(--gold);color:#20180a;border-color:var(--gold);}
+.btn.primary:hover{background:var(--gold-bright);}
+.btn.small{padding:5px 9px;font-size:11px;}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;}
+
+/* NAV */
+.nav{display:flex;gap:8px;margin-bottom:16px;}
+.navbtn{flex:0 0 auto;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 16px;font-size:12.5px;font-weight:600;color:var(--text-dim);}
+.navbtn.active{color:var(--gold-bright);border-color:var(--gold);}
+.navbtn:disabled{opacity:.35;cursor:not-allowed;}
+
+/* CHAPTER SCREEN */
+.chgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.chcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:left;}
+.chcard.locked{opacity:.4;}
+.chcard .num{font-size:10px;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;}
+.chcard .ttl{font-family:'Spectral',serif;font-size:15px;margin:4px 0 6px;}
+.chcard .desc{font-size:11.5px;color:var(--text-dim);line-height:1.5;}
+
+/* CHAPTER PAGINATION */
+.ch-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;}
+.ch-pager .ch-pager-title-wrap{flex:1;text-align:center;display:flex;align-items:baseline;justify-content:center;gap:8px;}
+.ch-pager .ch-pager-title{font-family:'Spectral',serif;font-size:18px;margin:0;}
+.ch-pager .ch-pager-count{font-size:11px;color:var(--text-dim);letter-spacing:.05em;white-space:nowrap;}
+.ch-pager-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;width:36px;height:36px;font-size:16px;cursor:pointer;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;}
+.ch-pager-btn:hover:not(:disabled){border-color:var(--gold);color:var(--gold-bright);}
+.ch-pager-btn:disabled{opacity:.3;cursor:not-allowed;}
+
+/* PREP SCREEN */
+.party-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.party-tab{flex:1 1 120px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:9px;text-align:center;font-size:12.5px;font-weight:600;}
+.party-tab.active{border-color:var(--gold);color:var(--gold-bright);background:var(--panel-2);}
+.prep-tabs{display:flex;gap:6px;margin-bottom:14px;}
+.prep-tab{flex:1;background:transparent;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:12px;color:var(--text-dim);font-weight:600;}
+.prep-tab.active{background:var(--panel-2);color:var(--gold-bright);border-color:var(--gold);}
+.slotgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.slot{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;font-size:11.5px;min-height:56px;display:flex;flex-direction:column;justify-content:center;gap:2px;}
+.slot .k{font-size:9.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;}
+.slot .v{font-weight:600;}
+.slot.empty{color:var(--text-dim);border-style:dashed;}
+.slot-effect{font-size:10px;color:var(--gold-bright);line-height:1.4;margin-top:2px;}
+.stat-row{display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border);}
+.stat-row:last-child{border-bottom:none;}
+.stat-row .k{color:var(--text-dim);}
+.stat-row .v{font-weight:600;font-family:'Spectral',serif;}
+.shop-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.shop-item:last-child{border-bottom:none;}
+.shop-item .d{color:var(--text-dim);font-size:10.5px;}
+
+/* BATTLE SCREEN */
+.battle-wrap{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border);margin-bottom:14px;}
+.battle-top-zone{position:relative;overflow:hidden;}
+.battle-layout{display:flex;gap:8px;align-items:stretch;}
+.portrait-box{
+  width:100px; flex:0 0 100px;
+  border:2px dashed var(--border); border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--panel-2);
+}
+.portrait-placeholder{
+  font-size:10.5px; color:var(--text-dim); text-align:center; line-height:1.6; padding:8px;
+}
+@media (max-width:760px){
+  .portrait-box{ width:64px; flex:0 0 64px; }
+  .portrait-placeholder{ font-size:9px; }
+}
+.battle-bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.5);}
+.battle-top{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:flex-start;padding:10px;gap:10px;flex-wrap:wrap;}
+.turn-order{background:rgba(15,17,21,.72);border:1px solid var(--border);border-radius:10px;padding:8px 10px;}
+.turn-order .lbl{font-size:10.5px;color:var(--gold);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+.turn-order .row{display:flex;gap:5px;}
+.tu{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;border:1px solid var(--border);background:var(--panel);flex:0 0 auto;position:relative;}
+.tu.ally{color:var(--ally);}
+.tu.enemy{color:var(--enemy);}
+.tu.current{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold-bright) inset;}
+.tu.dead{opacity:.3;}
+.battle-actions-top{background:rgba(15,17,21,.72);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:11.5px;}
+
+.grid-wrap{position:relative;z-index:2;padding:0 10px 10px;}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(4,44px);gap:3px;}
+.cell{background:rgba(20,22,32,.55);border:1px solid rgba(255,255,255,.06);border-radius:4px;position:relative;display:flex;align-items:center;justify-content:center;cursor:default;}
+.loot-star{position:absolute;top:1px;right:2px;font-size:9px;color:var(--gold-bright);pointer-events:none;text-shadow:0 0 3px rgba(0,0,0,.8);}
+.cell.selectable{background:rgba(201,162,39,.28);cursor:pointer;}
+.cell.aoe{background:rgba(194,84,46,.4);}
+/* 【斜紋雙色demo】預覽用，目前沒有任何指令實際套用這個class，純粹展示效果，
+   實際套色靠JS內聯style動態設定（見下方stripeCellBackground()），這裡只是把它視覺化的容器。
+   要拿掉這個demo時，把下面的.cell.stripe-preview規則跟stripeCellBackground()/applyStripePreviewDemo()一起刪掉即可。 */
+.cell.stripe-preview{cursor:pointer;}
+.unit-chip{width:34px;height:34px;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;cursor:pointer;position:relative;}
+.unit-chip.ally{background:var(--ally);color:#0d1a17;}
+.unit-chip.enemy{background:var(--enemy);color:#2a0f06;}
+.unit-chip.current{box-shadow:0 0 0 2px var(--gold-bright);}
+.unit-chip.down{opacity:.35;}
+.unit-chip.target-red{box-shadow:0 0 0 3px #ff5b45;}
+/* 施放預覽：紅底＝「點下去會生效/命中」的統一語意，同時用在棋盤unit-chip跟laser方向面板按鈕上 */
+.btn.target-red{background:var(--enemy);color:#fff;border-color:var(--enemy);}
+.btn.target-red:hover{background:#d8663e;}
+/* laser 8方向面板：3x3排列，中間格放取消鍵 */
+/* laser 8方向面板（.dir-panel）已於v0.15改回點格子版，不再需要，此CSS規則已移除 */
+.unit-hp{position:absolute;bottom:-6px;left:2px;right:2px;height:3px;background:#000;border-radius:2px;overflow:hidden;}
+.unit-hp > div{height:100%;background:var(--hp-low);}
+.bubble{position:absolute;bottom:38px;left:50%;transform:translateX(-50%);background:#fff;color:#1a1a1a;font-size:10px;padding:4px 7px;border-radius:6px;white-space:nowrap;max-width:160px;white-space:normal;width:max-content;max-width:150px;text-align:center;line-height:1.3;z-index:5;box-shadow:0 2px 6px rgba(0,0,0,.3);}
+.bubble:after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#fff;}
+
+.side-panel{position:relative;z-index:2;background:rgba(15,17,21,.85);border-top:1px solid var(--border);padding:12px;}
+.actor-info{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.actor-info .name{font-weight:600;font-size:14px;}
+.actor-info .hp{font-size:11.5px;color:var(--text-dim);}
+.actionbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.skillgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px;}
+.skillgrid button{font-size:11px;padding:8px 4px;}
+.skillgrid button.locked{color:var(--text-dim);border-style:dashed;}
+
+.msglog{position:relative;z-index:2;background:#0D0F17;border-top:1px solid var(--border);padding:8px 12px;font-size:12px;line-height:1.7;color:#C9C6BA;max-height:150px;overflow-y:auto;}
+.msglog .row{padding:1px 0;}
+.msglog .row b{color:var(--text);}
+.logbar{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:var(--panel);border-top:1px solid var(--border);}
+.logbar span{font-size:11px;color:var(--text-dim);}
+
+.result-banner{position:relative;z-index:3;background:var(--gold);color:#20180a;text-align:center;padding:14px;font-weight:700;font-size:15px;}
+
+/* 戰鬥結算浮動列：疊加在戰場畫面下方，不清空/遮擋整個戰場，讓玩家可以先看清楚戰場最終狀態再按返回 */
+.battle-result-overlay{
+  position:fixed; left:0; right:0; bottom:0; z-index:50;
+  background:linear-gradient(180deg, transparent, var(--ink-night) 35%);
+  padding:26px 16px 18px;
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+  animation:resultFadeUp .3s ease;
+}
+.battle-result-overlay .result-banner{
+  border-radius:10px; max-width:480px; width:100%;
+  box-shadow:0 4px 18px rgba(0,0,0,.45);
+}
+@keyframes resultFadeUp{ from{opacity:0; transform:translateY(12px);} to{opacity:1; transform:translateY(0);} }
+
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel-2);border:1px solid var(--gold);color:var(--gold-bright);padding:10px 18px;border-radius:10px;font-size:12.5px;opacity:0;transition:all .25s ease;z-index:60;pointer-events:none;font-weight:600;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+.fullscreen-fx{
+  position:fixed; inset:0; background:#000; z-index:200;
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; transition:opacity .25s ease;
+}
+.fullscreen-fx.show{ opacity:1; }
+.fullscreen-fx.fx-fadeout{ opacity:0; }
+.fullscreen-fx img{ max-width:100%; max-height:100%; }
+.fx-placeholder{ color:#fff; text-align:center; font-family:'Spectral',serif; font-size:22px; line-height:1.7; padding:20px; }
+.fx-placeholder .fx-sub{ font-size:12px; color:#888; display:block; margin-top:10px; font-family:'Inter'; }
+footer.foot{text-align:center;margin-top:20px;font-size:11px;color:var(--text-dim);}
+.version-tag{cursor:pointer;text-decoration:underline dotted;color:var(--text-dim);}
+.version-tag:hover{color:var(--gold-bright);}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:150;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+.modal-overlay.show{opacity:1;pointer-events:auto;}
+.modal-box{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto;}
+.modal-box .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.modal-box .modal-close{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;color:var(--text-dim);width:26px;height:26px;font-size:14px;line-height:1;cursor:pointer;}
+@media (max-width:760px){
+  .grid{grid-template-rows:repeat(4,30px);}
+  .unit-chip{width:24px;height:24px;font-size:8px;}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="nav" id="navBar"></div>
+
+  <div id="viewChapters"></div>
+  <div id="viewPrep" style="display:none;"></div>
+  <div id="viewCodex" style="display:none;"></div>
+  <div id="viewBattle" style="display:none;"></div>
+
+  <footer class="foot">第一階段核心版本 · 進度自動存於此瀏覽器。行動順序=速度10+隨機1~20；戰場為12×4格位系統。 <span class="version-tag" id="versionTag"></span></footer>
+</div>
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="changelogModal"><div class="modal-box">
+  <div class="modal-head"><h2 class="serif" style="margin:0;font-size:16px;">版本紀錄</h2><button class="modal-close" id="changelogModalClose">✕</button></div>
+  <div id="changelogModalBody"></div>
+</div></div>
+<audio id="bgm" loop></audio>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   STATIC DATA
+============================================================ */
+// ARCS：大章節（篇章/卷）分類。目前只有一卷，之後新增卷數時，
+// 在這裡加一筆，並把 CHAPTERS 對應的章節 arcId 指過來即可。
+const ARCS = [
+  {id:'arc1', name:'第一卷：邊境風雲'},
+  {id:'arc2', name:'第二卷：未知傳說'},  // 測試用，用來確認分頁翻到下一卷時標題會自動切換
+];
+
+const CHAPTERS = [
+  {id:0, arcId:'arc1', name:'序章：意外來客', desc:'哥布林巡邏隊擋在城鎮的邊界。學會戰鬥的基礎。', unlocked:true, battle:'goblin_patrol'},
+  {id:1, arcId:'arc1', name:'第一章（測試用）', desc:'測試用章節，目前沿用序章的戰鬥內容，之後可自行替換。', unlocked:true, battle:'goblin_patrol'},
+  {id:2, arcId:'arc1', name:'第二章（測試用）', desc:'測試用章節，目前沿用序章的戰鬥內容，之後可自行替換。', unlocked:true, battle:'goblin_patrol', recruitHint:'完成後加入吟遊詩人、祭司'},
+  {id:3, arcId:'arc1', name:'第三章（測試用）', desc:'測試用章節，目前沿用序章的戰鬥內容，之後可自行替換。', unlocked:true, battle:'goblin_patrol', recruitHint:'測試'},
+  {id:4, arcId:'arc1', name:'第四章（測試用）', desc:'測試用章節，目前沿用序章的戰鬥內容，之後可自行替換。', unlocked:true, battle:'goblin_patrol'},
+];
+
+// 每頁顯示的章節數量上限，避免手機上一次顯示太多章節卡片
+const CHAPTERS_PER_PAGE = 4;
+for(let i=5;i<=7;i++) CHAPTERS.push({id:i, arcId:'arc1', name:'第'+i+'章', desc:'尚未開放內容。', unlocked:false});
+for(let i=8;i<=20;i++) CHAPTERS.push({id:i, arcId:'arc2', name:'第'+i+'章', desc:'尚未開放內容。', unlocked:false});
+
+/* ============================================================
+   版本紀錄（Changelog）
+   想新增紀錄：複製一筆物件、改版本號/日期/內容即可，新的寫在陣列最前面
+============================================================ */
+const CHANGELOG = [
+  { version:'v0.21', date:'2026/09/08', notes:[
+    '.slot卡片左側加上顏色條（比照舊版.attrcard的左側色條做法，用.slot::before + --accent變數實作），跟右上角小圓點是同一個顏色值，兩者並存不衝突',
+    '裝備卡、屬性卡（等級/HP/SP/ATK/DEF四張）：直接沿用原本標圓點用的顏色，色條/圓點同色',
+    '技能卡新增 skillTypeColor()，依SKILL_DB既有的type欄位（attack/heal/buff）給色（借用--enemy/--ally/--eq-acc既有語意色），技能商店卡也一併套用',
+    '道具卡刻意先不標色：ITEM_DB目前沒有分類/type欄位可用，等之後補上分類資料再接色條，目前fallback顯示--border（等同無標色）',
+  ]},
+  { version:'v0.20 (game_dev4005分支)', date:'2026/09/05', notes:[
+    '獨立分支：從 game_dev40052.html v0.19 複製出來另開新編號 game_dev4005.html，往後這兩份各自獨立演進',
+    '屬性八宮格改用跟裝備/技能/道具同一套 .slot/.slotgrid 元件，卡片外觀/大小完全統一，不再是獨立的 .attrgrid/.attrcard 樣式（舊CSS已移除）',
+    '準備畫面右上角貨幣列新增「經驗」「天賦天球」，跟金幣/水晶並排顯示（一次看到四種資源，不用切分頁才看得到）',
+    'state.expPool／state.sphere 起始值改為5000（原本是0），存檔相容補丁的預設值也同步改成5000',
+  ]},
+  { version:'v0.19', date:'2026/09/05', notes:[
+    '【屬性八宮格正式上線】屬性分頁不再是文字列佔位，改成真正的4x2卡片網格：Lv/HP/SP(res)/暫定/ATK/DEF/暫定/暫定，跟商店卡片同一套視覺語言但不做翻牌。Lv卡吃經驗池升級（LEVEL_GROWTH_TABLE），HP/SP/ATK/DEF卡吃天賦天球鍛鍊，+10封頂，花費用attrTrainCost()',
+    '鍛鍊效果比照裝備/等級的非破壞性做法：不直接改c.atk/c.maxHp等基礎值，另外算trainingBonus()疊加，battle開戰組隊時跟equipBonus()一起加總（見TRAINING_BONUS_PER_POINT，每點效果先隨意填：HP+5/SP+2/ATK+1/DEF+1，之後可調）',
+    '【裝備/技能強化上線】兩邊的已裝備欄位都新增等級顯示+「強化」按鈕，Lv.5封頂（EQUIP_UPGRADE_CAP/SKILL_UPGRADE_CAP），花費暫定20×下一級（金幣/水晶），效果暫定：裝備每級各數值欄位+1、技能每級power/heal+3',
+    '技能強化效果正式接進戰鬥傷害/治療計算：executeSkill()新增skillLevelBonus()，battle開戰時ally物件多帶一份skillLevels（key→level）供查表，深層戰鬥邏輯只在這一處讀等級加成，不用大改executeSkill以外的地方',
+    '戰場拾取道具改成跟商店共用同一個固定庫存池：attemptLoot()從unowned實例裡找同key的來拿，不再無限生成新實例；商店賣光/戰場撿完都會互相影響對方庫存（MOMO確認採用這個方向）。已知小落差：戰場地板上的道具圖示位置本身沒有跟著檢查庫存，可能出現「地上看得到但撿不到」的情況，這次不動battle floor佈置邏輯，需要的話留待下一輪',
+    '賣出裝備/道具、戰鬥中用掉道具，先前v0.18誤植為「永久刪除實例」，這次修正為「狀態退回unowned回到商店庫存」，同一個iid之後可以再買回（MOMO確認：賣不賣沒差，重點是不會憑空消失）',
+    '裝備部位色點CSS補上完整位置/大小/顏色的修改註解',
+    '準備畫面新增角色立繪框（PORTRAIT_MAP新增xxx_normal系列key，跟戰鬥用的xxx_default是兩張不同圖，圖檔尚未提供，先顯示虛線佔位框）',
+  ]},
+  { version:'v0.18', date:'2026/09/05', notes:[
+    '【設計文件第二節 Stage 2：個體實例模型正式上線】裝備/技能/道具全面改為 iid+status(unowned/owned/equipped) 個體實例，c.equipment[slot]/c.skills[i]/c.items[i] 現在存iid不是key字串；商店庫存＝unowned實例數量，真的會售完（之前雖然文件寫限量，程式其實無限供應，這次補上）',
+    '技能書owner鎖定機制正式拿掉（設計文件第五節），改用 canUse()/charReq 判斷，任何角色都能裝倉庫裡的技能書',
+    '戰鬥引擎銜接：ally構建時把iid解析回key（skills/items），深層戰鬥邏輯（executeSkill/道具使用面板等）完全不用改，只在battle-start這個邊界做一次轉換，降低這次遷移的風險範圍',
+    '賣出裝備/道具、戰鬥中用掉道具，都改成「狀態退回unowned」而不是刪除實例——同一個iid回到商店庫存，可以再買回來（MOMO確認：賣不賣沒差，重點是不會憑空消失）。場上撿到的道具維持原邏輯，生成全新實例（不占用商店固定庫存）',
+    '裝備部位新增8色標籤圓點（head/chest/hands/waist/feet/acc，色票先暫定），CSS加了完整註解教怎麼改位置/大小/顏色',
+    '新增準備畫面角色立繪（PORTRAIT_MAP新增 xxx_normal 系列key，跟戰鬥用的 xxx_default 是兩張不同圖），圖片檔案本身尚未提供，先顯示虛線佔位框，之後把圖丟進 assets/portraits/ 對應檔名即可自動生效',
+    '存檔相容性：偵測到舊格式存檔（沒有equipInstances等新欄位）會直接開新局，不寫遷移腳本（沿用專案一貫政策）',
+    '本輪測試方式：用jsdom建立DOM環境，實際模擬點擊「購買→裝備→卸除→倉庫列表→賣出」跟「開戰→技能面板→結束回合」整條路徑，確認沒有crash、也沒有"undefined"字樣殘留（代表iid解析都成功）',
+    '刻意仍未做（範圍更大的UI overhaul，需要另外一輪）：①商店併入倉庫的混合清單/分頁/底部抽屜UI；②屬性8宮格正式UI（目前只在屬性分頁文字列顯示新數值）；③技能/道具type標籤色（攻擊/治療/buff/debuff）尚未接到實際SKILL_DB/ITEM_DB資料上',
+  ]},
+  { version:'v0.17', date:'2026/09/04', notes:[
+    '【設計文件第十六節 Stage 1：資料模型地基】新增 state.sphere（天賦天球，屬性鍛鍊專用資源，原「鍛鍊結晶」改名，單純數值同金幣/水晶）、state.expPool（人物等級共用經驗池）',
+    '角色物件新增 level／training{hp,sp,atk,def} 欄位（純資料，尚未接上戰鬥數值計算，只在屬性分頁文字列可見）',
+    '新增 canUse(itemOrSkill, charId) 共用判斷函式，落實設計文件第五節 charReq 機制（欄位存在即限制、不存在即通用）。EQUIP_DB/SKILL_DB/ITEM_DB 目前尚無任何一筆資料填 charReq，之後逐一設計哪些要鎖時直接加欄位即可，不用改這支函式',
+    '新增 LEVEL_GROWTH_TABLE（先快後慢曲線，Lv.20封頂，數值為暫定佔位）、ATTR_TRAIN_CAP/attrTrainCost()（屬性鍛鍊+10封頂/花費表暫定）、SKILL_CAP_BASE/ITEM_CAP_BASE=4＋MILESTONE_BONUS=0（技能/道具攜帶上限，getSkillCap()/getItemCap()）',
+    '刻意不做（Stage 2 待辦，會牽動戰鬥引擎與大量UI，需另外仔細驗證後再動）：①c.equipment/c.skills/c.items 改存iid的個體實例遷移——目前 actor.skills[i] 等處仍直接讀SKILL_DB等資料的key字串，戰鬥引擎多處依賴這個假設，貿然改動風險高；②商店併入倉庫的混合清單/分頁/底部抽屜UI；③屬性8宮格正式UI（目前只在屬性分頁加了一行文字暫代）；④裝備類型標籤（武器/防具/飾品）——討論時發現demo用的3類跟現有EQUIP_DB實際8欄位(head/chest/hands/waist/feet/acc1-3)對不上，需要先跟MOMO確認怎麼對應再動',
+  ]},
+  { version:'v0.16', date:'2026/09/01', notes:[
+    '射程(黃)/生效(紅)語意統一：shape===1(單體/自身)技能補上reach範圍黃底(共用anchorCellCandidates())，跟AOE/all/laser一樣看得出「這技能打得到哪裡」，不用再靠試點才知道範圍',
+    '紅底改為格子背景層級：原本shape===1/\'all\'/laser的合法目標只有unit-chip外框發紅，格子本身沒有變色，跟AOE/laser「格子背景變色」不一致；這次統一改成redTargetUnits(不論來自技能/脫逃/道具哪個mode)一律把站的那一格背景染紅，chip外框保留當作疊加的加強提示，不是取代',
+    '新增斜紋雙色demo(stripeCellBackground()/applyStripePreviewDemo())：純展示用，回應「如果之後想用兩色斜紋表示雙重資訊(例如脫逃的射程+範圍)長怎樣」的提案，目前沒有接到任何實際指令上，可以自己在console測試預覽',
+    '本輪刻意保留不動：道具改成技能分類(炸彈=AOE/藥草=單體/勇氣號角=全體)、脫逃機制本身(維持點自己confirm)、COMMAND_COLORS每個指令各自顏色的方案——要再研究，先不寫死',
+  ]},
+  { version:'v0.15', date:'2026/09/01', notes:[
+    'laser改回點格子版：拿掉v0.14的8方向面板（renderLaserCompass已刪除），改成選了laser技能後直接在棋盤上標黃/紅（8條方向線分別判定，該方向有目標整條標紅、沒有標黃仍可空放），玩家點任一格→新增resolveLaserDirection()反推該格屬於哪個方向→朝那個方向發動，命中該方向laserTargets()算出的全部單位（不是只打被點到的那格）',
+    '脫逃改為需要confirm：點「脫逃」不再立即執行，改成進入flee選取模式（自己的unit-chip標紅），要再點自己的頭像才會真正呼叫doFlee()，避免手滑誤觸整隊撤退',
+    '道具改為需要指定目標：點道具不再直接對自己生效，改成選取模式（自己＋相鄰隊友的unit-chip標紅，reach:1/targetSide:ally，重用singleTargetCandidates()不用另開函式），點紅底目標才真正使用道具、對被點到的那個人生效——道具現在可以治療相鄰隊友，不再限定只能對自己用；再點一次同一顆道具鈕可取消選取。拾取（空格子點擊撿東西）維持原本一鍵執行，因為只能撿自己腳下的東西、沒有目標歧義',
+    '修正一個既有顯示bug：側邊欄的行動/技能按鈕原本選取時只設 className=\'primary\'（缺少基礎.btn class），CSS的.btn.primary規則其實從未真正生效過，未選取時則完全沒有class、退回瀏覽器預設白底樣式。這次統一改成固定套用\'btn small\'再疊加選取狀態的\'primary\'，選取後正確顯示金黃底，未選取維持面板深色底',
+    '清掉v0.14的.dir-panel CSS（compass面板已被上面的點格子版取代，不再使用）',
+  ]},
+  { version:'v0.14', date:'2026/09/01', notes:[
+    'laser機制正式落地：新增 LASER_DIRECTIONS（8方向定義）、laserArea()（沿方向直線命中判定，不含施放者自己站的格子，遇棋盤邊界即停）、laserTargets()（套用targetSide篩選）三個共用函式',
+    '新增梅恩（祭司）第一個主動攻擊技能「聖光」：power4/reach12/cd0/零消耗的雜魚清掃型招式，定位是靠laser「打穿一整排」的範圍效益、不是單體輸出效率，數值為暫定值待實戰調整',
+    '新增側邊欄8方向面板（renderLaserCompass），3x3排列、中間格為取消鍵；選了laser技能後側邊欄整個換成這個面板，不顯示原本的技能清單，取消可以退回選取前的狀態',
+    '施放預覽系統：三層規則統一實作——單體/自身技能在合法目標的unit-chip標紅（新增.target-red樣式）；全體技能(shape:\'all\')整場標黃(純視覺，表示這是全場技能)＋合法目標標紅；AOE技能(shape>1)維持候選錨點標黃，新增選定錨點後的N×N範圍標紅預覽；laser方向面板的8個方向按鈕，偵測到該方向線上有合法目標的直接標紅（同一套「紅＝點下去會生效」語意）',
+    'AOE技能改為三點式流程：點技能→點黃底選錨點(顯示紅底預覽)→點紅底範圍內任一格confirm發動；改點別的黃底格會直接重新預覽新錨點，不用先取消；紅底範圍內允許空放（無目標一樣可以點下去發動，不強制攔截），呼應「可以空放技能沒問題」的定案',
+    '刪除self(reach:0)與shape:\'all\'技能原本「選取後自動觸發、沒有confirm機會」的特例邏輯：self技能改為自然流入既有的單體判定流程（自己距離自己一定是0，本來就會通過singleTargetCandidates，不用另外寫程式），玩家點自己所在格的unit-chip才會真正發動；all技能改為點任一個紅底目標都視為confirm、對全體符合targetSide的單位生效，不是只對被點到的那個生效',
+    '修正AOE技能點擊死角：原本 unit-chip 的 stopPropagation 會讓「點在有單位的格子」永遠吃不到 onCellClick，導致AOE技能點到站著人的格子時完全沒反應；onUnitClick 新增判斷，AOE狀態下點單位會直接轉呼叫 onCellClick(target.x, target.y)，跟點空格走同一套三點式流程',
+    '本輪範圍刻意排除：laser方向面板本身尚未在棋盤格上預覽命中路徑（只在面板按鈕本身標紅），這個之後有需要再疊加；manhattan距離模式與diamond範圍形狀維持凍結，不在本輪範圍內（見 dev4_design_todo.md 第十節）',
+  ]},
+  { version:'v0.13', date:'2026/08/31', notes:[
+    '敵人AI重新設計（第一輪）：新增決策層 decideEnemyAction()，取代原本寫死 goblin_hit 的版本——技能改成動態讀取 actor.skills 陣列查 SKILL_DB，之後任何敵人配任何技能都不用改AI程式碼',
+    '目標判定改用 singleTargetCandidates()（跟玩家點技能同一套函式），敵人的攻擊/治療/自療統一共用 shape/targetSide/reach 判定，不用為敵人另寫特例',
+    '新增加權評分機制 scoreTarget()：依目標傷勢比例、防禦是否偏低、這次攻擊是否能斬殺三項加分，取代原本adjacentEnemies裡的隨機挑選；挑選時保留pTop%隨機浮動，不是100%必選最高分，避免玩家用「墊血量」等手法完全操控AI鎖定對象',
+    '新增 AI_PROFILES 分級參數表（dumb/normal/elite），同一套評分骨架套不同權重即可分級，本輪三級數值先設成相同（僅接架構），之後要分級只需調整參數數值，敵人身上標 aiProfile 欄位即可套用，查無此欄位或打錯字會自動fallback到normal',
+    '治療觸發邏輯改為「門檻＋機率」：血量比例低於50%（HEAL_HP_RATIO_THRESHOLD）才「考慮」治療，考慮到了還要過40%機率（HEAL_TRIGGER_CHANCE）才真的觸發，取代原本「不看傷勢、固定40%機率」的舊版邏輯',
+    '技能執行改為直接呼叫 executeSkill()，跟玩家操作路徑完全共用，log/音效/冷卻/資源扣除都自動處理，不再是敵人專屬的簡化複製邏輯',
+    '敵人移動改用旗標系統(movePts)分步進行，移動後若進入射程內會自動再決策一次，本輪可以做到「移動→攻擊」的組合行動（尚不支援「攻擊→移動」，此簡化見程式碼註解）',
+    '本輪範圍刻意排除：AOE技能(shape>1)的AI施放邏輯、真正的路徑搜尋（沿用單軸試探，卡住會放棄剩餘移動）、指揮官機制——皆留待對應底層系統（AOE系統/STATUS_DB）更成熟後再處理',
+    '移除死程式碼 adjacentEnemies()（新版已無呼叫端，功能由 singleTargetCandidates() 取代）',
+    '已用Node.js獨立邏輯測試驗證：治療門檻正確攔截未達傷勢的治療觸發、冷卻中/資源不足的技能會被正確排除、動態技能讀取非寫死、斬殺加分能明顯提高瀕死目標被選中機率（實測與pTop設定值相符）',
+  ]},
+  { version:'v0.12', date:'2026/08/31', notes:[
+    '技能範圍系統重構：原本命名式的 shape 值（adjacent/ranged/aoe3x3/self/all）改為 reach（切比雪夫距離）+ shape（N×N方塊數字 或 \'all\'）兩個連續參數，取代寫死的分類名稱，之後路卡等遠程角色、各種射程的AOE都只是填不同數字，不用再新增shape分類',
+    '新增規則：單體技能(shape:1)必須點在有合法目標的格子上；範圍技能(shape>1)允許空放，範圍內沒打到人算技能落空（沿用原本的落空提示）',
+    '新增規則：reach:0 的技能（原本的self）不用玩家再點一次確認，選擇技能就直接以自己為中心觸發，此邏輯同時適用於未來「以自己為中心的範圍技能」，不限單體',
+    '技能命中判定改用共用的 chebyshev()／squareArea() 函式，取代原本寫死在 onCellClick 裡的 3x3 判定，AOE技能的射程與範圍大小現在都是資料驅動（SKILL_DB 填 reach/shape 即可），不用改程式邏輯',
+    'shape:\'laser\'（沿方向直線攻擊）欄位值已預留但尚未實作，UI互動方式待設計（見 dev4_design_todo.md 第十節），目前沒有技能使用',
+    '本次重構為「距離/範圍兩層拆分」設計定案後的落地實作，重擊/火球的 reach 暫時沿用舊版「不限位置」行為（REACH_UNLIMITED），數值本身仍為暫定，之後可依平衡測試調整',
+  ]},
+  { version:'v0.11', date:'2026/08/30', notes:[
+    '重構：拿掉獨立的「普通攻擊」按鈕，全部輸出手段統一併入技能系統——每個角色技能清單保底安排一個零消耗基礎攻擊技能取代原本的普通攻擊',
+    '新增基礎技能：賽特「奧術飛刃」、古蘭「魯特琴敲擊」，讓兩人也有零消耗的基礎輸出手段',
+    '技能傷害正式吃角色ATK：傷害公式改為「技能power + 施放者ATK − 目標DEF + 隨機浮動」，讓角色升級/裝備加的ATK對技能輸出角色也有意義（之前只有普通攻擊吃得到ATK）',
+    '技能資料欄位重構：原本身兼「形狀」與「敵我對象」兩種意義的 range 欄位，拆分成 shape（adjacent/ranged/aoe3x3/all/self）與 targetSide（enemy/ally/all/self）兩個獨立欄位，敵我判定邏輯集中成單一共用函式，之後指揮官技能等「範圍debuff打我方」的組合不用再另外寫程式',
+    '技能執行核心整併：原本並存的4段重複邏輯（castSingle/castAoe/castAllAllies/doAttack）合併成單一 executeSkill 函式，降低之後改動時多處漏改的風險',
+  ]},
+  { version:'v0.10', date:'2026/08/29', notes:[
+    '重做：戰鬥回合改成三旗標結構——每個單位每輪有「移動池3步」「技能1次(攻擊併入技能名額)」「互動1次(檢查/拾取/使用道具共用)」三種獨立名額',
+    '三個名額可以任意順序使用，全部用完才自動結束回合；沒用完也能按「結束回合」提前放棄剩餘名額',
+    '移動改成依實際走的格數扣點，可以分次移動，不用一次走到底',
+    '「檢查」原本不消耗回合，現在併入互動名額（跟拾取共用同一個名額）',
+    '側邊行動面板新增名額顯示列（移動/技能/互動各自剩餘量）',
+  ]},
+  { version:'v0.09', date:'2026/08/29', notes:[
+    '調整：版本紀錄從章節畫面移除，改成頁尾一個小版本號，點擊後彈窗顯示',
+    '新增：技能商店改用「水晶」計價，跟裝備/道具/寶物庫的金幣分開計算，準備畫面右上角同時顯示金幣與水晶',
+  ]},
+  { version:'v0.08', date:'2026/08/28', notes:[
+    '新增：技能欄位可卸除技能書，跟裝備/道具一樣收進倉庫，不用重新花錢就能裝回去',
+    '技能書倉庫會記住原本的持有者，只能裝回卸下時的那位角色（技能是角色個別學會的，不像裝備可以隨便換人用）',
+  ]},
+  { version:'v0.07', date:'2026/08/26', notes:[
+    '新增：道具倉庫——道具可從角色身上卸下存進共用倉庫，任何角色都能取用或賣出（半價回收）',
+    '調整：裝備倉庫從獨立分頁移到裝備分頁下方，操作更集中',
+    '新增：章節卡片會標示「完成後解鎖＿＿」，提前讓玩家知道打贏這章會加入新隊友',
+  ]},
+  { version:'v0.06', date:'2026/08/26', notes:[
+    '新增：戰場拾取系統——有物品的格子會顯示金色星星標記，點道具欄空格可拾取「腳下」的物品',
+    '拾取成功會消耗回合；腳下沒東西時不會浪費行動',
+    '（測試用）每場戰鬥開始會在場上隨機灑落幾樣測試物品，方便測試拾取流程',
+  ]},
+  { version:'v0.05', date:'2026/08/26', notes:[
+    '新增：共用倉庫——卸下的裝備不分角色統一存放，可重新裝上任一角色，也可賣出（半價回收）',
+    '新增：上場名單——玩家可自由選擇角色上場/替補，上限4人、至少1人（最後一位無法被移到替補）',
+    '新增：角色池依章節解鎖——makeChar 新增 unlockChapter 參數，達到對應章節進度才會出現在可選名單',
+    '修正：裝備商店/寶物庫購買時，若該部位原本已有裝備，現在會自動收進倉庫，不會再直接消失',
+    '（測試用）第0～4章暫時全部開放，方便測試角色池解鎖與章節切換',
+  ]},
+  { version:'v0.04', date:'2026/08/26', notes:[
+    '新增：技能音效系統，每個技能可分別設定 soundCast（演出開始時播放）與 soundHit（效果結算當下播放）',
+    '音效與背景音樂為疊加播放，不會讓BGM暫停或變小聲',
+    '修正：敵人立繪對應不上的問題（敵人id每次戰鬥會重新產生，改用固定的 portraitKey 對照）',
+  ]},
+  { version:'v0.03', date:'2026/08/25', notes:[
+    '新增：所有技能施放時會觸發全螢幕演出效果，可依技能各自設定停留時間與消失方式（淡出／瞬間）',
+    '（圖片尚未提供，目前顯示技能名稱佔位；之後在 SKILL_DB 該技能加上 fxImage 檔名即可自動生效）',
+    '新增：戰場左右兩側預留角色立繪位置（我方/敵方），會依目前選取的技能自動切換要顯示的圖片鍵值',
+    '（圖片尚未提供，目前顯示為虛線佔位框，之後把圖片放進 PORTRAIT_MAP 即可自動生效）',
+  ]},
+  { version:'v0.02', date:'2026/08/25', notes:[
+    '新增：戰鬥中第4個固定格「檢查」，可指定格子查看狀況，不消耗回合（地形/機關邏輯尚未實裝）',
+    '新增：四種商店（裝備13格／技能9格／道具16格／寶物庫8格）分別整合進對應的準備分頁下方',
+    '新增：裝備分頁可直接卸除已裝備物品',
+    '新增：「回顧」分頁——歷史／地理／人物／神器四類圖鑑，部分內容需達成特定條件才會解鎖',
+    '新增：分頁開關系統，之後可透過 TAB_ENABLED 直接開關大分頁，不用刪程式碼',
+  ]},
+  { version:'v0.01', date:'2026/08/25', notes:[
+    '修正：戰鬥中可誤觸「章節」「準備」導致戰鬥異常的問題，戰鬥中導航列現在會鎖定',
+    '修正：戰鬥背景不再隨訊息紀錄展開/收合而跟著跑位',
+    '新增：攻擊／移動／脫逃併入技能列前3格，操作面板更統一',
+    '新增：技能選中時會有金色高亮提示',
+    '新增：章節畫面下方的版本紀錄（就是你正在看的這個）',
+  ]},
+  { version:'v0.00', date:'2026/08/23', notes:[
+    '第一階段核心版本上線：章節選單、準備畫面、12×4戰場、行動順序條、基礎戰鬥系統',
+  ]},
+];
+
+/* ============================================================
+   回顧（Codex）圖鑑資料
+   unlockFlag: null = 一開始就看得到；填字串 = 需要達成對應旗標才會解鎖
+   image: 檔名（可留空 null），對應到跟game.html同資料夾下的圖片檔
+   想新增條目：複製一筆物件，改id/category/name/desc即可
+============================================================ */
+const CODEX_CATEGORIES = [
+  {key:'history', label:'歷史'},
+  {key:'geography', label:'地理'},
+  {key:'people', label:'人物'},
+  {key:'artifact', label:'神器'},
+];
+const CODEX_ENTRIES = [
+  { id:'lore_dusk', category:'history', name:'無盡的黃昏', unlockFlag:null, image:null,
+    desc:'曾經色彩斑斕的世界，如今正一寸寸褪成灰色。沒有人記得侵蝕從何時開始，只知道它從未停止過。' },
+  { id:'geo_bridge', category:'geography', name:'木橋渡口', unlockFlag:null, image:'assets/images/bg002.png',
+    desc:'夕陽下的古老渡口，據說曾經連接兩座興盛的王國，如今只剩海風與潮聲。' },
+  { id:'geo_whisperwood', category:'geography', name:'低語森林', unlockFlag:'defeated_goblin_patrol', image:'assets/images/bg001.png',
+    desc:'樹葉會低聲重複旅人說過的話，直到那些話語失去意義。哥布林巡邏隊長年徘徊於此。' },
+  { id:'ppl_daren', category:'people', name:'達倫', unlockFlag:null, image:null,
+    desc:'走遍世界的劍士，話不多，但總是站在隊伍最前方。' },
+  { id:'ppl_sete', category:'people', name:'賽特', unlockFlag:null, image:null,
+    desc:'鑽研古老魔法的學者，隨身攜帶法杖與寶石，對世界的侵蝕現象抱持研究興趣。' },
+  { id:'ppl_guran', category:'people', name:'古蘭', unlockFlag:null, image:null,
+    desc:'吟遊詩人，相信歌聲與故事同樣能對抗敵人。' },
+  { id:'ppl_shiyi', category:'people', name:'梅恩', unlockFlag:null, image:null,
+    desc:'肩負著信仰的祭司，每一天的祈禱都是為了更美好的世界。' },
+  { id:'art_fragment', category:'artifact', name:'記憶碎片', unlockFlag:null, image:null,
+    desc:'承載著某段即將被侵蝕之事物的殘片，收集齊全或許能喚醒沉睡的力量。' },
+  { id:'art_totem', category:'artifact', name:'骷髏圖騰', unlockFlag:'defeated_goblin_patrol', image:null,
+    desc:'哥布林首領的古老圖騰，據說能讓佩戴者的動作快人一步。' },
+];
+
+const DAMAGE_TYPES = ['敲擊','劈砍','穿刺','火焰','閃電','冷凍','聲波','治療','無傷害'];
+
+/* 依技能資料自動組出一句效果摘要文字（例如「劈砍 18・冷卻3回合・消耗10」），
+   不用每個技能手動寫desc，資料改了摘要就自動跟著變 */
+function skillSummaryText(d){
+  let parts = [];
+  if(d.type === 'attack') parts.push(`${d.dmgType} ${d.power}`);
+  else if(d.type === 'heal') parts.push(`治療 ${d.power}`);
+  else parts.push('功能性技能');
+  if(d.cd) parts.push(`冷卻${d.cd}回合`);
+  if(d.cost && d.cost.res) parts.push(`消耗${d.cost.res}`);
+  return parts.join(' · ');
+}
+
+/* 依裝備資料自動組出屬性摘要文字（例如「+5 鎧甲值, +1 防禦」），
+   跟 skillSummaryText 同一套邏輯：不用手動寫lore，資料改了摘要就自動跟著變。
+   EQUIP_DB / TREASURY_DB 裡原本手寫的 lore 欄位保留下來當作「故事敘述」，
+   之後做 codex 圖鑑時可以直接拿 .lore 顯示，但一般裝備欄/商店/倉庫一律改用這個函式。
+   想新增可以顯示的屬性種類，直接在 STAT_LABELS 裡加一行即可。 */
+const STAT_LABELS = { atk:'攻擊', def:'防禦', spd:'速度', armor:'鎧甲值', res:'資源上限' };
+function equipSummaryText(d){
+  const parts = Object.keys(STAT_LABELS)
+    .filter(k => d[k])
+    .map(k => `+${d[k]} ${STAT_LABELS[k]}`);
+  return parts.length ? parts.join(', ') : '（無屬性加成）';
+}
+
+/* 依道具資料自動組出效果摘要文字（例如「恢復30點HP」），
+   跟 skillSummaryText / equipSummaryText 同一套邏輯：不用手動寫lore。
+   想讓道具支援新效果（例如解除異常、增益等），直接在這裡加一個 if 判斷即可。 */
+function itemSummaryText(d){
+  let parts = [];
+  if(d.heal) parts.push(`恢復${d.heal}點HP`);
+  return parts.length ? parts.join(', ') : '（無效果）';
+}
+
+/* ============================================================
+   【range 系統改版：shape enum 換成 reach + shape 兩參數，見 range_sim.html 模擬器與 dev4_design_todo.md 第十二節】
+   - reach（number）：切比雪夫距離上限，決定「這個技能可以把錨點放在哪」
+     reach:0 代表唯一合法錨點就是施放者自己，UI上會直接自動觸發，不用玩家再點一次
+   - shape（number | 'all' | 'laser'）：以錨點為中心展開的命中範圍
+     N（正整數）= N×N方塊，N=1即單體技能，N為偶數時往右下多蓋一格
+     'all'      = 不看reach，直接套用在 targetSide 篩選出的「全部」單位身上（原本的 ally_all）
+     'laser'    = 沿方向直線打到底（尚未實作，UI互動方式待設計，見 dev4_design_todo.md 第十節「尚待解決」；
+                  目前 SKILL_DB 沒有技能使用這個值，資料格式先預留）
+   - 錨點合法性規則：shape===1（單體）時，錨點必須落在有合法目標（matchesSide通過）的格子上才算數，
+     所以由 onUnitClick 直接點單位判定；shape>1（AOE）允許空放，範圍內有沒有目標交給執行時的 matchesSide 判定，
+     所以由 onCellClick 點格子判定，錨點只受 reach 限制、不要求該格有人
+   - targetSide：不變，純粹決定套用在哪個陣營，相對於施放者自身陣營計算，敵我雙方共用同一套判斷：
+     'enemy' = 施放者的敵對陣營　'ally' = 施放者的同陣營　'all' = 不分敵我　'self' = 僅施放者自己
+   - reach 數值目前為暫定值（尤其 REACH_UNLIMITED 用來保留舊版「不限位置」行為，例如重擊/火球原本就能點全場任意格），
+     之後平衡測試時可能會依角色設計調整（例如重擊改成真正的近戰限定射程），不影響本次架構
+============================================================ */
+const REACH_UNLIMITED = 99; // 全場任一格都在範圍內（12x4棋盤最大切比雪夫距離遠小於這個值），僅為保留舊版「不限位置」行為的權宜值
+
+/* ============================================================
+   【施放確認階段】不是每個技能單獨設定的欄位，而是由 shape 自動決定要走幾段確認流程，
+   目前存在的3種：
+
+   階段A（0次確認，按下即發動）：目前沒有任何技能在用。
+     v0.13以前 self（reach:0）跟 shape:'all' 是這樣（選取後自動觸發），
+     v0.14拿掉了，因為容易手滑誤觸、也沒有反悔機會。架構上還是可以做，
+     只要在renderSidePanel()技能按鈕的onclick裡跳過「只選取」那段、直接showFullscreenFX+executeSkill即可，
+     但目前刻意不用，全部技能都至少要求1次確認。
+
+   階段B（1次確認，選取後立即預覽紅底，點紅底即發動）：shape===1（單體/自身）、shape==='all'（全體）、shape==='laser'。
+     這幾種的共通點是「選了技能的當下，候選目標就已經是確定的」，不需要額外的「選範圍」步驟，
+     紅底在點技能的那一刻就會立即顯示（不用等玩家做任何動作）。
+     - shape===1：紅底顯示在 singleTargetCandidates() 篩出的unit-chip上（可能是敵人/隊友/自己）。
+       如果選取後棋盤上完全沒有紅底，通常代表「目前沒有合法目標在範圍內」（例如相鄰系技能reach:1，
+       但沒有敵人真的站在自己旁邊），這是正常情況、不是bug——移動靠近目標後重新選取技能，紅底就會出現。
+     - shape==='all'：紅底顯示在所有matchesSide()篩出的unit-chip上，另外整場棋盤標黃（純視覺提示「這是全場技能」）。
+     - shape==='laser'：紅底/黃底顯示在8條方向線的沿途格子上（見computeSkillHighlights），
+       因為reach通常很大（例如聖光reach:12），幾乎每次選取都會立刻看到紅底，這是reach數值造成的差異，
+       不是shape===1跟shape==='laser'的確認邏輯不同——兩者都是「選取當下就預覽，點一次confirm」。
+
+   階段C（2次確認，先選範圍/方向再對範圍內容確認發動）：shape>1的AOE技能（例如fireball）。
+     第一次確認＝選定/改選錨點（點黃底候選格，棋盤即時預覽該錨點展開的N×N紅底範圍）；
+     第二次確認＝點紅底範圍內任一格才真正發動。改點別的黃底格會直接重新預覽新錨點，不用先取消。
+     這是唯一需要「先看範圍長怎樣、才決定要不要打」的類型，因為AOE的錨點是連續空間、不像laser只有8個離散方向可選。
+
+   之後如果想讓某個技能刻意套用不同階段（例如想讓某個技能維持階段A秒發），
+   目前沒有專屬欄位可以直接標記，要靠shape間接決定——真的有需要時再討論是否要加一個獨立的confirmStage欄位覆寫這個預設對應規則。
+============================================================ */
+const SKILL_DB = {
+  slash:      { name:'斬擊', type:'attack', dmgType:'劈砍', power:10, reach:1, shape:1, targetSide:'enemy', cost:{res:0}, cd:0, lines:['看招!','喝!'] },
+  heavy:      { name:'重擊', type:'attack', dmgType:'敲擊', power:18, reach:REACH_UNLIMITED, shape:3, targetSide:'enemy', cost:{res:10}, cd:3, 
+  fxDuration:1200, fxFade:'fade', fxImage:'assets/images/heavy_skill.png', soundCast:'assets/sfx/heavy_cast.mp3', soundHit:'assets/sfx/heavy_hit.mp3', lines:['這一擊,終結一切!','感受這份重量吧!'] },
+  guard:      { name:'格擋', type:'buff', dmgType:'無傷害', power:0, reach:0, shape:1, targetSide:'self', cost:{res:0}, cd:0, effect:'defup', 
+  fxDuration:1200, fxFade:'instant',fxImage:'assets/images/guard_skill.png', soundCast:'assets/sfx/guard_cast.mp3', lines:['站穩了。','來吧,我接得住。'] },
+
+  arcane_bolt:{ name:'奧術飛刃', type:'attack', dmgType:'魔法', power:6, reach:1, shape:1, targetSide:'enemy', cost:{res:0}, cd:0, lines:['去吧,奧術之刃!','這只是暖身而已。'] },
+  fireball:   { name:'火球', type:'attack', dmgType:'火焰', power:114, reach:REACH_UNLIMITED, shape:3, targetSide:'enemy', cost:{res:8}, cd:2, 
+  fxDuration:1200, fxFade:'fade',fxImage:'assets/images/fireball_skill.png', soundCast:'assets/sfx/fireball_cast.mp3', soundHit:'assets/sfx/fireball_hit.mp3', lines:['灼焰之靈,聽我召喚!','燃燒吧!'] },
+  heal:       { name:'治療術', type:'heal', dmgType:'治療', power:16, reach:REACH_UNLIMITED, shape:1, targetSide:'ally', cost:{res:6}, cd:1, 
+  fxDuration:1200, fxFade:'fade',fxImage:'assets/images/heal_skill.png', soundCast:'assets/sfx/heal_cast.mp3', lines:['傷口啊,癒合吧。','讓光為你引路。'] },
+
+  lute_bash:  { name:'魯特琴敲擊', type:'attack', dmgType:'敲擊', power:6, reach:1, shape:1, targetSide:'enemy', cost:{res:0}, cd:0, lines:['別逼我用琴打你!','這下有點走音了。'] },
+  song_buff:  { name:'鼓舞之歌', type:'buff', dmgType:'無傷害', power:0, reach:0, shape:'all', targetSide:'ally', cost:{res:5}, cd:3, effect:'atkup', lines:['風啊,把勇氣捎給他們!','唱給每一顆心聽。'] },
+  song_heal:  { name:'安魂曲', type:'heal', dmgType:'治療', power:8, reach:0, shape:'all', targetSide:'ally', cost:{res:8}, cd:3, lines:['別怕,傷口會記得如何癒合。'] },
+
+  chronicle:  { name:'至聖斬', type:'attack', dmgType:'劈砍', power:9, reach:1, shape:1, targetSide:'enemy', cost:{res:0}, cd:0, lines:['震懾於神之威壓吧。'] },
+  recall:     { name:'聖光治療', type:'heal', dmgType:'治療', power:10, reach:0, shape:1, targetSide:'self', cost:{res:5}, cd:2, lines:['我將會完好如初。'] },
+  // 【laser機制測試技能】雜魚清掃用的輕型招式：低傷害、零消耗、cd0，價值在於「一次打穿一整排」而非單體輸出效率，數值為暫定值待實戰調整
+  holy_light: { name:'聖光', type:'attack', dmgType:'聖光', power:4, reach:12, shape:'laser', targetSide:'enemy', cost:{res:0}, cd:0, lines:['聖光,滌淨吧。','願你們得到救贖。'] },
+
+  goblin_hit: { name:'棍棒攻擊', type:'attack', dmgType:'敲擊', power:6, reach:1, shape:1, targetSide:'enemy', cost:{res:0}, cd:0, lines:['嘎啊啊!','咕嚕嚕!'] },
+  goblin_heal:{ name:'咒術激勵', type:'heal', dmgType:'治療', power:10, reach:REACH_UNLIMITED, shape:1, targetSide:'ally', cost:{res:0}, cd:2, lines:['咕...咕嚕嚕嚕...'] },
+};
+
+/* ============================================================
+   【角色池解鎖／上場替補 編輯教學】
+   makeChar 最後兩個參數：
+   - unlockChapter：從第幾章開始，這個角色會出現在「可選名單」裡。
+     判斷方式是跟 state.maxChapterReached（玩家目前打贏過的最高章節）比較，
+     unlockChapter <= maxChapterReached 就會解鎖。想調整誰何時解鎖，
+     直接改這個數字即可，不用動其他程式碼。
+   - defaultActive：這個角色資料一開始建立時，是否預設「上場中」
+     （只有已解鎖的角色這個值才有意義；上場名單上限固定4人）
+============================================================ */
+function makeChar(id, name, role, hp, atk, def, res, resMax, skills, unlockChapter, defaultActive){
+  return {
+    id, name, role, side:'ally',
+    hp, maxHp:hp, atk, def, spd:10, armor:0,
+    resName:res, res:0, resMax,
+    skills, // array of skill keys, up to 8 (null = empty slot)
+    equipment:{ head:null, chest:null, hands:null, waist:null, feet:null, acc1:null, acc2:null, acc3:null },
+    items:['potion','potion','bandage', null,null,null,null,null],
+    alive:true, x:-1, y:-1,
+    unlockChapter: unlockChapter != null ? unlockChapter : 0,
+    active: !!defaultActive,
+    // ── 人物等級／屬性鍛鍊（新，設計文件第十六節）──────────────────
+    // 尚未接上戰鬥數值計算／UI，先建立資料欄位，見 LEVEL_GROWTH_TABLE 與
+    // ATTR_TRAIN_BASE／ATTR_TRAIN_MILESTONE_BONUS 附近的說明
+    level: 1,
+    training: { hp:0, sp:0, atk:0, def:0 }, // 各屬性目前已鍛鍊的加值（+0~+10）
+  };
+}
+
+function freshParty(){
+  return [
+    makeChar('daren','達倫','劍士', 50, 12, 6, '怒氣', 55, ['slash','heavy','guard',null,null,null,null,null], 
+    0, true),
+    makeChar('sete','賽特','法師', 30, 8, 3, 'MP', 30, ['arcane_bolt','fireball','heal',null,null,null,null,null], 
+    0, true),
+    makeChar('guran','古蘭','吟遊詩人', 32, 7, 3, '靈感', 30, ['lute_bash','song_buff','song_heal',null,null,null,null,null], 
+    2, false),
+    makeChar('shiyi','梅恩','祭司', 34, 9, 4, '虔誠', 20, ['chronicle','recall','holy_light',null,null,null,null,null], 
+    2, false),
+  ];
+}
+
+const EQUIP_DB = {
+  daren_chest:  {name:'鐵鱗胸甲', slot:'chest', armor:5, def:1, cost:30, lore:'+5 鎧甲值, +1 防禦'},
+  daren_head:   {name:'鋼盔', slot:'head', def:1, cost:15, lore:'+1 防禦'},
+  sete_head:    {name:'學者兜帽', slot:'head', res:3, cost:15, lore:'+3 資源上限'},
+  acc_power:    {name:'力量護符', slot:'acc', atk:2, cost:20, lore:'+2 攻擊'},
+  acc_swift:    {name:'速度之羽', slot:'acc', spd:2, cost:20, lore:'+2 速度'},
+  iron_helm:    {name:'鐵盔', slot:'head', def:1, armor:1, cost:18, lore:'+1 防禦, +1 鎧甲值'},
+  cloth_robe:   {name:'布織長袍', slot:'chest', res:4, cost:22, lore:'+4 資源上限'},
+  leather_gloves:{name:'皮革護手', slot:'hands', atk:1, cost:14, lore:'+1 攻擊'},
+  sturdy_belt:  {name:'堅韌腰帶', slot:'waist', def:1, cost:14, lore:'+1 防禦'},
+  sash_of_focus:{name:'凝神腰封', slot:'waist', res:2, cost:16, lore:'+2 資源上限'},
+  swift_boots:  {name:'疾行靴', slot:'feet', spd:1, cost:16, lore:'+1 速度'},
+  iron_greaves: {name:'鐵護脛', slot:'feet', armor:1, cost:16, lore:'+1 鎧甲值'},
+  lucky_charm:  {name:'幸運徽章', slot:'acc', atk:1, def:1, cost:24, lore:'+1 攻擊, +1 防禦'},
+  steel_greaves: {name:'鋼鐵護脛', slot:'feet', armor:5, cost:160, lore:'+5 鎧甲值'},
+};
+/* 上面這批的 lore 目前只是舊的屬性摘要字串（尚未寫過真正的故事文字），
+   等做 codex 圖鑑時記得把它們換成真正的敘述，寫法可以參考下面 TREASURY_DB
+   的寶物（skull_totem 等）——那些才是真正的「故事類」lore 範例。 */
+
+const ITEM_DB = {
+  potion:        {name:'日根靈藥', cost:8, heal:15, lore:'恢復15點HP'},
+  bandage:       {name:'繃帶', cost:4, heal:8, lore:'恢復8點HP'},
+  greater_potion:{name:'上級靈藥', cost:20, heal:30, lore:'恢復30點HP'},
+  minor_bandage: {name:'簡易繃帶', cost:3, heal:5, lore:'恢復5點HP'},
+  field_ration:  {name:'行軍糧', cost:6, heal:12, lore:'恢復12點HP'},
+  healing_herb:  {name:'癒療草', cost:5, heal:10, lore:'恢復10點HP'},
+};
+
+/* 技能商店：目前開放全部11個已設計的隊伍技能（含dev4新增的兩個保底基礎攻擊：奧術飛刃、魯特琴敲擊），
+   之後想增加新技能，先寫進SKILL_DB，再把key加進這個陣列跟成本表即可 */
+const SKILL_SHOP_KEYS = ['slash','heavy','guard','arcane_bolt','fireball','heal','lute_bash','song_buff','song_heal','chronicle','recall'];
+const SKILL_SHOP_COST = { slash:10, heavy:25, guard:15, arcane_bolt:10, fireball:30, heal:25, lute_bash:10, song_buff:25, song_heal:30, chronicle:10, recall:15 };
+
+/* 寶物庫：稀有/特殊物品，目前先開放購買不限制條件，之後條件解鎖系統上線後會加上解鎖判斷 */
+const TREASURY_DB = {
+  skull_totem:    {name:'骷髏圖騰', slot:'acc', spd:1, cost:10, lore:'哥布林首領的古老圖騰。'},
+  ancient_coin:   {name:'古老硬幣', slot:'acc', atk:1, cost:10, lore:'不知名文明鑄造的硬幣。'},
+  moth_wing_charm:{name:'蛾翼護符', slot:'acc', def:1, cost:10, lore:'不憶之蛾的翅膀碎片。'},
+};
+/* 查詢裝備效果時，同時查一般裝備跟寶物庫（寶物庫不算進裝備商店的13格） */
+function lookupEquip(key){
+  return EQUIP_DB[key] || TREASURY_DB[key] || null;
+}
+
+/* ============================================================
+   角色差異化：charReq 限定機制（設計文件第五節定案）
+   - 欄位存在即限制、欄位不存在即通用，裝備/技能/道具共用同一套判斷
+   - charReq 可為字串（單人）或陣列（多人）
+   - 之後要把某個限定技能/裝備開放成通用，只需刪除該筆資料的 charReq 那一行，
+     不用改這個判斷函式本身
+   目前 EQUIP_DB / SKILL_DB / ITEM_DB 尚未有任何一筆資料填上 charReq
+   （哪些要鎖，待逐一設計時決定——見設計文件待辦清單第4項）
+============================================================ */
+function canUse(itemOrSkill, charId){
+  if(!itemOrSkill || !itemOrSkill.charReq) return true; // 無欄位 = 通用
+  const req = Array.isArray(itemOrSkill.charReq) ? itemOrSkill.charReq : [itemOrSkill.charReq];
+  return req.includes(charId);
+}
+
+/* ============================================================
+   STATE / STORAGE
+============================================================ */
+/* ============================================================
+   人物等級系統（設計文件第十六節）
+   - 全體角色共用 state.expPool，升級花費從池子裡扣
+   - 先快後慢曲線、Lv.20封頂，這裡先放一個暫定表，之後依平衡測試調整
+   - 尚未接上：升級按鈕(屬性分頁)、levelBonus()（等級對戰鬥數值的非破壞性加成）、
+     每5級一次的里程碑掛勾點（目前留空）
+============================================================ */
+const LEVEL_GROWTH_TABLE = (()=>{
+  // 暫定公式：先快後慢，Lv.20封頂。之後想要精確數值表，直接把這行改成寫死陣列即可
+  const table = [0]; // index 0 不使用，index i = 升到 Lv.i 需要的經驗
+  for(let lv=1; lv<=20; lv++){
+    table.push(Math.round(50 * lv * Math.pow(lv, 0.6)));
+  }
+  return table;
+})();
+
+/* ============================================================
+   屬性鍛鍊系統（設計文件第十六節）
+   - 消耗 state.sphere（天賦天球），每屬性各自獨立花費表，+10封頂
+   - 目前只有 HP／SP／ATK／DEF 四種，其餘屬性尚未決定（8宮格第7、8格待補）
+   - 尚未接上：鍛鍊按鈕(屬性分頁8宮格UI)、花費表最終數值
+============================================================ */
+const ATTR_TRAIN_CAP = 10; // 每屬性鍛鍊上限，+10封頂
+function attrTrainCost(trainedSoFar){
+  // 暫定：花費隨已鍛鍊次數遞增，之後依平衡測試調整成正式表
+  return 10 + trainedSoFar * 5;
+}
+/* 鍛鍊效果：不直接改c.atk/c.maxHp等基礎值（比照裝備/等級的非破壞性做法），
+   而是額外算一個bonus，在顯示跟戰鬥開始組隊時另外加總。每點鍛鍊的效果先隨意填，
+   之後想調整平衡，直接改這個表的數字即可，呼叫端都不用改 */
+const TRAINING_BONUS_PER_POINT = { hp:5, sp:2, atk:1, def:1 };
+function trainingBonus(c, key){ return (c.training[key]||0) * (TRAINING_BONUS_PER_POINT[key]||0); }
+
+/* ============================================================
+   技能／道具攜帶上限（設計文件待辦清單第21項）
+   - 各自獨立計算，範圍預期 4~8
+   - 目前尚未接上：現有 c.skills／c.items 仍是寫死8格陣列，
+     要讓這兩個常數真正生效，需要把角色資料的欄位長度改成動態
+     （屬於Stage 2，會牽動戰鬥引擎讀取c.skills/c.items的地方，
+     這次先只建立常數本身，不動陣列大小，避免戰鬥邏輯連帶出錯）
+============================================================ */
+const SKILL_CAP_BASE = 4;             // 技能欄基礎上限，可修改
+const SKILL_CAP_MILESTONE_BONUS = 0;  // 技能欄里程碑加值，目前0，之後隨里程碑遞增，可修改
+const ITEM_CAP_BASE = 4;              // 道具欄基礎上限，可修改
+const ITEM_CAP_MILESTONE_BONUS = 0;   // 道具欄里程碑加值，目前0，之後隨里程碑遞增，可修改
+function getSkillCap(){ return SKILL_CAP_BASE + SKILL_CAP_MILESTONE_BONUS; }
+function getItemCap(){ return ITEM_CAP_BASE + ITEM_CAP_MILESTONE_BONUS; }
+
+let state = null;
+
+/* ============================================================
+   個體實例模型（設計文件第二節／第十六節定案，Stage 2 實作）
+   - state.equipInstances / skillInstances / itemInstances：
+     { [iid]: {key, level, status} }，status: 'unowned' | 'owned' | 'equipped'
+   - c.equipment[slot] / c.skills[i] / c.items[i] 現在存的是 iid，不是key字串
+   - 商店庫存＝篩選 status==='unowned' 的實例；倉庫＝status==='owned'；
+     角色身上＝status==='equipped'
+   - 起始角色配裝（makeChar給的原始key字串）與商店庫存是分開各自建立的
+     實例，不互相共用同一份（起始配裝不會佔用商店的庫存數量）
+   - 目前每個key先各建1個「unowned」商店庫存（暫定數量，見設計文件
+     待辦清單第1項，之後要改成逐項設計的正式數量，直接改 seedInstances()
+     裡的迴圈次數即可）
+============================================================ */
+function makeIid(st, prefix){ st.iidCounter = (st.iidCounter||0) + 1; return prefix+'_'+st.iidCounter; }
+
+function seedInstances(st){
+  // 起始角色配裝：把 makeChar 給的原始key字串轉成「已裝備」的個體實例
+  st.party.forEach(c=>{
+    c.skills = c.skills.map(key=>{
+      if(!key) return null;
+      const iid = makeIid(st,'sk');
+      st.skillInstances[iid] = { key, level:1, status:'equipped' };
+      return iid;
+    });
+    c.items = c.items.map(key=>{
+      if(!key) return null;
+      const iid = makeIid(st,'it');
+      st.itemInstances[iid] = { key, level:1, status:'equipped' };
+      return iid;
+    });
+    // c.equipment 起始全部是null，不用轉換
+  });
+  // 商店庫存：裝備(含寶物庫)/技能/道具，每個key先給1個unowned實例
+  Object.keys(EQUIP_DB).forEach(key=>{
+    const iid = makeIid(st,'eq'); st.equipInstances[iid] = { key, level:1, status:'unowned' };
+  });
+  Object.keys(TREASURY_DB).forEach(key=>{
+    const iid = makeIid(st,'eq'); st.equipInstances[iid] = { key, level:1, status:'unowned' };
+  });
+  SKILL_SHOP_KEYS.forEach(key=>{
+    const iid = makeIid(st,'sk'); st.skillInstances[iid] = { key, level:1, status:'unowned' };
+  });
+  Object.keys(ITEM_DB).forEach(key=>{
+    const iid = makeIid(st,'it'); st.itemInstances[iid] = { key, level:1, status:'unowned' };
+  });
+}
+
+/* ============================================================
+   裝備／技能強化（設計文件第四節／待辦清單第22項）
+   - Lv.5封頂，花費/效果全部先隨意填一個簡單公式，MOMO確認之後可以隨時調整
+   - 效果暫定：每升1級，裝備身上「有的那幾個數值欄位」(atk/def/armor/spd)各自+1；
+     技能每升1級，power/heal 欄位 +3（攻擊技能與治療技能共用同一個power欄位，
+     所以兩者都吃得到，見 executeSkill()）
+   - 花費暫定：金幣/水晶 × 下一級數，之後想換成正式的每級專屬數值表，
+     直接把這兩個函式內容換掉即可，呼叫端不用改
+============================================================ */
+const EQUIP_UPGRADE_CAP = 5;
+const SKILL_UPGRADE_CAP = 5;
+function equipUpgradeCost(nextLevel){ return 20 * nextLevel; } // 金幣，暫定
+function skillUpgradeCost(nextLevel){ return 20 * nextLevel; } // 水晶，暫定
+const EQUIP_LEVEL_STAT_BONUS_PER_LEVEL = 1; // 裝備每級各數值欄位+1，暫定
+const SKILL_LEVEL_POWER_BONUS_PER_LEVEL = 3; // 技能每級power/heal+3，暫定
+function skillLevelBonus(actor, key){
+  const lvl = (actor.skillLevels && actor.skillLevels[key]) || 1;
+  return (lvl - 1) * SKILL_LEVEL_POWER_BONUS_PER_LEVEL;
+}
+
+function equipInstOf(iid){ return iid ? state.equipInstances[iid] : null; }
+function equipDefOf(iid){ const inst = equipInstOf(iid); return inst ? lookupEquip(inst.key) : null; }
+/* 裝備某個數值欄位「含強化等級加成」後的實際數值。沒有這個欄位就回傳0（方便直接加總）。 */
+function equipEffectiveStat(iid, statKey){
+  const inst = equipInstOf(iid);
+  const def = equipDefOf(iid);
+  if(!inst || !def || !def[statKey]) return 0;
+  return def[statKey] + (inst.level - 1) * EQUIP_LEVEL_STAT_BONUS_PER_LEVEL;
+}
+function eqTagColor(slot){
+  // 裝備部位色票（暫定，之後想改直接調整 :root 裡的 --eq-xxx hex 即可）
+  const map = { head:'--eq-head', chest:'--eq-chest', hands:'--eq-hands', waist:'--eq-waist', feet:'--eq-feet', acc:'--eq-acc' };
+  return `var(${map[slot] || '--eq-acc'})`;
+}
+function skillTypeColor(type){
+  // 技能type色票（暫定，直接借用現有的語意色：attack→敵方紅、heal→我方綠、buff→飾品紫）
+  // 之後SKILL_DB若新增debuff等其他type，在這個map裡加一行對應即可
+  const map = { attack:'var(--enemy)', heal:'var(--ally)', buff:'var(--eq-acc)' };
+  return map[type] || 'var(--border)';
+}
+function skillInstOf(iid){ return iid ? state.skillInstances[iid] : null; }
+function skillDefOf(iid){ const inst = skillInstOf(iid); return inst ? SKILL_DB[inst.key] : null; }
+function itemInstOf(iid){ return iid ? state.itemInstances[iid] : null; }
+function itemDefOf(iid){ const inst = itemInstOf(iid); return inst ? ITEM_DB[inst.key] : null; }
+
+function freshState(){
+  const st = {
+    chapterProgress: {0:'available'},
+    party: freshParty(),
+    gold: 4000,
+    crystal: 3200, // 技能商店專用貨幣
+    sphere: 5000, // 天賦天球（原「鍛鍊結晶」改名）：屬性鍛鍊專用資源，單純數值，跟金幣/水晶同等級，不走個體實例。起始值5000（MOMO指定）
+    expPool: 5000, // 人物等級系統共用經驗池，全體角色共用同一池，升級花費從這裡扣。起始值5000（MOMO指定）
+    flags: {}, // 通用旗標：紀錄擊敗過的敵人、達成的事件，供商店解鎖/回顧圖鑑解鎖使用
+    maxChapterReached: 0, // 玩家目前打贏過的最高章節，用來判斷角色池要解鎖到誰
+    iidCounter: 0,
+    equipInstances: {}, // {iid: {key, level, status}}
+    skillInstances: {},
+    itemInstances: {},
+  };
+  seedInstances(st);
+  return st;
+}
+function hasFlag(key){ return !!(state.flags && state.flags[key]); }
+function setFlag(key){ state.flags = state.flags || {}; state.flags[key] = true; }
+function saveGame(){
+  try{ window.storage.set('rpg-p1-save', JSON.stringify(state), false).catch(()=>{}); }catch(e){}
+}
+async function loadGame(){
+  try{
+    const res = await window.storage.get('rpg-p1-save', false);
+    if(res && res.value){ state = JSON.parse(res.value); return true; }
+  }catch(e){}
+  return false;
+}
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._tm);
+  toast._tm = setTimeout(()=>t.classList.remove('show'), 2000);
+}
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+/* ============================================================
+   NAV
+   【分頁開關】想暫時關閉某個大分頁，把對應值改成 false 就好，
+   不用刪程式碼、不用找位置，存檔重整後該分頁按鈕會直接消失。
+============================================================ */
+const TAB_ENABLED = {
+  chapters: true,
+  prep: true,
+  codex: true,
+};
+const NAV_TABS = [
+  {key:'chapters', label:'章節'},
+  {key:'prep', label:'準備'},
+  {key:'codex', label:'回顧'},
+];
+function renderNav(){
+  const bar = document.getElementById('navBar');
+  bar.innerHTML = '';
+  NAV_TABS.filter(t=>TAB_ENABLED[t.key]).forEach(t=>{
+    const b = document.createElement('button');
+    b.className = 'navbtn';
+    b.dataset.view = t.key;
+    b.textContent = t.label;
+    b.onclick = ()=>{ if(!b.disabled) switchView(t.key); };
+    bar.appendChild(b);
+  });
+}
+function switchView(v){
+  document.querySelectorAll('.navbtn').forEach(b=> b.classList.toggle('active', b.dataset.view===v));
+  document.getElementById('viewChapters').style.display = v==='chapters' ? '' : 'none';
+  document.getElementById('viewPrep').style.display = v==='prep' ? '' : 'none';
+  document.getElementById('viewCodex').style.display = v==='codex' ? '' : 'none';
+  document.getElementById('viewBattle').style.display = v==='battle' ? '' : 'none';
+  if(v==='chapters') renderChapters();
+  if(v==='prep') renderPrep();
+  if(v==='codex') renderCodex();
+  if(v==='codex') renderCodex();
+}
+function setNavLocked(locked){
+  document.querySelectorAll('.navbtn').forEach(b=>{
+    if(b.dataset.view === 'battle') return;
+    b.disabled = locked;
+    b.title = locked ? '戰鬥尚未結束，請先脫逃或完成戰鬥' : '';
+  });
+}
+
+/* ============================================================
+   CHAPTER VIEW
+============================================================ */
+// 記住玩家目前瀏覽到第幾頁（0-indexed），重新進入章節畫面時維持在原本的頁面
+let chapterPageIndex = 0;
+
+function renderChapters(){
+  const el = document.getElementById('viewChapters');
+  const totalPages = Math.max(1, Math.ceil(CHAPTERS.length / CHAPTERS_PER_PAGE));
+  // 邊界保護：避免資料變動後頁碼超出範圍
+  if(chapterPageIndex >= totalPages) chapterPageIndex = totalPages - 1;
+  if(chapterPageIndex < 0) chapterPageIndex = 0;
+
+  const pageStart = chapterPageIndex * CHAPTERS_PER_PAGE;
+  const pageChapters = CHAPTERS.slice(pageStart, pageStart + CHAPTERS_PER_PAGE);
+
+  // 目前這頁章節所屬的Arc（用第一筆章節的arcId去查對應大章節名稱，
+  // 供標題顯示用；同一頁理論上章節都屬於同一卷）
+  const arc = ARCS.find(a => a.id === (pageChapters[0] && pageChapters[0].arcId));
+  const arcName = arc ? arc.name : '故事 · 章節選擇';
+
+  el.innerHTML = `<div class="card">
+    <div class="ch-pager">
+      <button class="ch-pager-btn" id="chPrevBtn" ${chapterPageIndex<=0 ? 'disabled' : ''}>‹</button>
+      <div class="ch-pager-title-wrap">
+        <h2 class="ch-pager-title">${arcName}</h2>
+        <span class="ch-pager-count">${chapterPageIndex+1} / ${totalPages}</span>
+      </div>
+      <button class="ch-pager-btn" id="chNextBtn" ${chapterPageIndex>=totalPages-1 ? 'disabled' : ''}>›</button>
+    </div>
+    <div class="chgrid" id="chGrid"></div>
+  </div>`;
+
+  const grid = document.getElementById('chGrid');
+  pageChapters.forEach(ch=>{
+    const div = document.createElement('div');
+    div.className = 'chcard' + (ch.unlocked ? '' : ' locked');
+    div.innerHTML = `<div class="num">Chapter ${ch.id}</div><div class="ttl serif">${ch.name}</div><div class="desc">${ch.desc}</div>
+      ${ch.recruitHint ? `<div style="font-size:11px;color:var(--gold-bright);margin-top:6px;">★ ${ch.recruitHint}</div>` : ''}
+      ${ch.unlocked ? '<button class="btn primary" style="margin-top:10px;width:100%;">出發</button>' : ''}`;
+    if(ch.unlocked){
+      div.querySelector('button').onclick = ()=> startBattle(ch.battle, ch.id);
+    }
+    grid.appendChild(div);
+  });
+
+  const prevBtn = document.getElementById('chPrevBtn');
+  const nextBtn = document.getElementById('chNextBtn');
+  if(prevBtn) prevBtn.onclick = ()=>{ chapterPageIndex--; renderChapters(); };
+  if(nextBtn) nextBtn.onclick = ()=>{ chapterPageIndex++; renderChapters(); };
+}
+
+/* ============================================================
+   CODEX VIEW（回顧）
+============================================================ */
+let codexState = { tab:'history' };
+
+function renderCodex(){
+  const el = document.getElementById('viewCodex');
+  el.innerHTML = `<div class="card">
+    <h2 class="serif" style="margin-top:0;">回顧 · 圖鑑</h2>
+    <div class="prep-tabs" id="codexTabs"></div>
+    <div id="codexBody"></div>
+  </div>`;
+  const tabsEl = document.getElementById('codexTabs');
+  CODEX_CATEGORIES.forEach(cat=>{
+    const b = document.createElement('button');
+    b.className = 'prep-tab' + (codexState.tab===cat.key ? ' active' : '');
+    b.textContent = cat.label;
+    b.onclick = ()=>{ codexState.tab = cat.key; renderCodex(); };
+    tabsEl.appendChild(b);
+  });
+
+  const body = document.getElementById('codexBody');
+  const entries = CODEX_ENTRIES.filter(e=>e.category===codexState.tab);
+  if(entries.length===0){
+    body.innerHTML = `<div style="font-size:12.5px;color:var(--text-dim);padding:10px 0;">這個分類目前還沒有內容。</div>`;
+    return;
+  }
+  body.innerHTML = entries.map(e=>{
+    const unlocked = !e.unlockFlag || hasFlag(e.unlockFlag);
+    if(!unlocked){
+      return `<div class="card" style="margin-top:10px;opacity:.5;">
+        <div style="font-weight:600;font-size:13.5px;margin-bottom:4px;">？？？</div>
+        <div style="font-size:11.5px;color:var(--text-dim);">尚未解鎖 · 完成特定事件後解鎖</div>
+      </div>`;
+    }
+    return `<div class="card" style="margin-top:10px;">
+      ${e.image ? `<img src="${e.image}" style="width:100%;border-radius:8px;margin-bottom:8px;display:block;">` : ''}
+      <div style="font-weight:600;font-size:13.5px;margin-bottom:4px;">${e.name}</div>
+      <div style="font-size:12.5px;color:var(--text-dim);line-height:1.7;">${e.desc}</div>
+    </div>`;
+  }).join('');
+}
+let prepState = { selectedId:null, tab:'equip' };
+
+function unlockedCharacters(){
+  return state.party.filter(p => p.unlockChapter <= (state.maxChapterReached||0));
+}
+
+function renderPrep(){
+  const el = document.getElementById('viewPrep');
+  const unlocked = unlockedCharacters();
+  if(!prepState.selectedId || !unlocked.find(p=>p.id===prepState.selectedId)){
+    prepState.selectedId = unlocked[0] ? unlocked[0].id : null;
+  }
+  const c = state.party.find(p=>p.id===prepState.selectedId);
+
+  const lockedCount = state.party.length - unlocked.length;
+
+  el.innerHTML = `
+    <div class="party-tabs" id="partyTabs"></div>
+    ${lockedCount>0 ? `<div style="font-size:11px;color:var(--text-dim);margin:-6px 0 12px;">還有 ${lockedCount} 位角色尚未加入隊伍。</div>` : ''}
+    ${c ? `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="portrait-box" style="width:56px;flex:0 0 56px;height:56px;">${prepPortraitHtml(c)}</div>
+          <h2 class="serif" style="margin:0;">${c.name} <span style="font-size:12px;color:var(--text-dim);">· ${c.role}</span></h2>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:flex-end;">
+          <div class="stat-row" style="border:none;padding:0;"><span class="k">金幣</span>&nbsp;<span class="v">${state.gold}</span></div>
+          <div class="stat-row" style="border:none;padding:0;"><span class="k">水晶</span>&nbsp;<span class="v">${state.crystal}</span></div>
+          <div class="stat-row" style="border:none;padding:0;"><span class="k">經驗</span>&nbsp;<span class="v">${state.expPool}</span></div>
+          <div class="stat-row" style="border:none;padding:0;"><span class="k">天賦天球</span>&nbsp;<span class="v">${state.sphere}</span></div>
+        </div>
+      </div>
+      <div class="prep-tabs" id="prepTabs">
+        <button class="prep-tab ${prepState.tab==='equip'?'active':''}" data-tab="equip">裝備</button>
+        <button class="prep-tab ${prepState.tab==='skill'?'active':''}" data-tab="skill">技能</button>
+        <button class="prep-tab ${prepState.tab==='item'?'active':''}" data-tab="item">道具</button>
+        <button class="prep-tab ${prepState.tab==='stat'?'active':''}" data-tab="stat">屬性</button>
+      </div>
+      <div id="prepBody"></div>
+    </div>` : `<div class="card"><div style="font-size:12.5px;color:var(--text-dim);">目前沒有可管理的角色。</div></div>`}
+  `;
+
+  /* ============================================================
+     【上場/替補 星星切換 教學】
+     每個角色分頁按鈕旁邊會有一顆星星（★=上場中／☆=替補中）。
+     點星星本身：切換該角色上場/替補（不影響你正在編輯誰）。
+     點角色名字文字：切換「目前正在編輯的角色」（裝備/技能/道具畫面）。
+     兩個動作分開處理，互不影響。
+     上場上限固定4人、至少要保留1人上場（最後一人星星會鎖住不能點）。
+  ============================================================ */
+  const tabsEl = document.getElementById('partyTabs');
+  const activeCount = unlocked.filter(p=>p.active).length;
+  unlocked.forEach(p=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'party-tab' + (p.id===prepState.selectedId?' active':'');
+    wrap.style.display = 'flex';
+    wrap.style.alignItems = 'center';
+    wrap.style.gap = '4px';
+    wrap.style.justifyContent = 'center';
+
+    const star = document.createElement('span');
+    star.textContent = p.active ? '★' : '☆';
+    star.title = p.active ? '上場中（點擊移至替補）' : '替補中（點擊上場）';
+    star.style.color = p.active ? 'var(--gold-bright)' : 'var(--text-dim)';
+    star.style.cursor = 'pointer';
+    const lockedStar = (p.active && activeCount<=1) || (!p.active && activeCount>=4);
+    if(lockedStar){ star.style.opacity = '.35'; star.style.cursor='not-allowed'; }
+    star.onclick = (e)=>{
+      e.stopPropagation();
+      if(lockedStar) return;
+      p.active = !p.active;
+      saveGame(); renderPrep();
+    };
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = p.name;
+    nameSpan.onclick = ()=>{ prepState.selectedId = p.id; renderPrep(); };
+
+    wrap.appendChild(star);
+    wrap.appendChild(nameSpan);
+    tabsEl.appendChild(wrap);
+  });
+
+  if(!c){ return; }
+
+  document.querySelectorAll('.prep-tab').forEach(b=>{
+    b.onclick = ()=>{ prepState.tab = b.dataset.tab; renderPrep(); };
+  });
+  renderPrepBody(c);
+}
+
+function renderPrepBody(c){
+  const body = document.getElementById('prepBody');
+
+  if(prepState.tab === 'equip'){
+    const slots = ['head','chest','hands','waist','feet','acc1','acc2','acc3'];
+    const labels = {head:'頭部',chest:'胸部',hands:'手部',waist:'腰部',feet:'腳部',acc1:'飾品1',acc2:'飾品2',acc3:'飾品3'};
+    body.innerHTML = `
+
+<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">裝備欄位（8格）</div>
+
+<div class="slotgrid">` + slots.map(s=>{
+      const iid = c.equipment[s];
+      const eqData = equipDefOf(iid);
+      const inst = equipInstOf(iid);
+      const maxed = inst && inst.level >= EQUIP_UPGRADE_CAP;
+      const nextCost = inst ? equipUpgradeCost(inst.level+1) : 0;
+      const eqAccent = eqTagColor(s.startsWith('acc')?'acc':s);
+      return `<div class="slot ${eqData?'':'empty'}" style="--accent:${eqAccent}">
+        <div class="slot-tagdot" style="background:${eqAccent}"></div>
+        <div class="k">${labels[s]}${inst ? ` · Lv.${inst.level}` : ''}</div>
+        <div class="v">${eqData ? eqData.name : '（空）'}</div>
+        ${eqData ? `<div class="slot-effect">${equipSummaryText(eqData)}${inst && inst.level>1 ? `（強化中，各數值再+${(inst.level-1)*EQUIP_LEVEL_STAT_BONUS_PER_LEVEL}）` : ''}</div>` : ''}
+        ${iid ? `<button class="btn small" data-upgrade-equip="${s}" style="margin-top:4px;width:100%;" ${maxed || state.gold<nextCost ? 'disabled':''}>${maxed ? '已滿級' : `強化 (${nextCost}金)`}</button>` : ''}
+        ${iid ? `<button class="btn small" data-unequip="${s}" style="margin-top:4px;width:100%;">卸除</button>` : ''}
+      </div>`;
+    }).join('') + `</div>
+      <div style="font-size:12px;color:var(--text-dim);margin:16px 0 8px;">裝備商店（${Object.keys(EQUIP_DB).length}/13）</div>
+      <div class="slotgrid" id="equipShopGrid"></div>
+      <div style="font-size:12px;color:var(--text-dim);margin:16px 0 8px;">共用裝備倉庫（${Object.values(state.equipInstances).filter(i=>i.status==='owned').length}件）· 卸下的裝備不分角色，任何人都能重新裝上，也可以直接賣出</div>
+      <div id="equipWarehouseList"></div>`;
+    body.querySelectorAll('[data-unequip]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const slot = btn.dataset.unequip;
+        const iid = c.equipment[slot];
+        const inst = equipInstOf(iid);
+        if(inst) inst.status = 'owned';
+        c.equipment[slot] = null;
+        toast('已卸除，收進倉庫');
+        saveGame(); renderPrep();
+      };
+    });
+    body.querySelectorAll('[data-upgrade-equip]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const slot = btn.dataset.upgradeEquip;
+        const inst = equipInstOf(c.equipment[slot]);
+        if(!inst || inst.level >= EQUIP_UPGRADE_CAP) return;
+        const cost = equipUpgradeCost(inst.level+1);
+        if(state.gold < cost){ toast('金幣不足'); return; }
+        state.gold -= cost;
+        inst.level++;
+        toast('已強化至 Lv.'+inst.level);
+        saveGame(); renderPrep();
+      };
+    });
+    const equipStockByKey = {};
+    Object.values(state.equipInstances).forEach(inst=>{ if(inst.status==='unowned') equipStockByKey[inst.key] = (equipStockByKey[inst.key]||0)+1; });
+    const equipEntries = Object.entries(EQUIP_DB).map(([k,d])=> [k, Object.assign({}, d, {desc: equipSummaryText(d), tagColor: eqTagColor(d.slot)})]);
+    renderShopGrid('equipShopGrid', equipEntries, (key,it)=>{
+      if(state.gold < it.cost) return;
+      const iidToBuy = Object.keys(state.equipInstances).find(iid=> state.equipInstances[iid].key===key && state.equipInstances[iid].status==='unowned');
+      if(!iidToBuy){ toast('已售完'); return; }
+      state.gold -= it.cost;
+      const slot = it.slot === 'acc' ? (['acc1','acc2','acc3'].find(s=>!c.equipment[s]) || 'acc1') : it.slot;
+      if(c.equipment[slot]){
+        const oldInst = equipInstOf(c.equipment[slot]);
+        if(oldInst) oldInst.status = 'owned'; // 該部位原本裝備的東西，改存進倉庫而不是直接消失
+      }
+      state.equipInstances[iidToBuy].status = 'equipped';
+      c.equipment[slot] = iidToBuy;
+      toast('已裝備 '+it.name);
+      saveGame(); renderPrep();
+    }, (key)=> !equipStockByKey[key], null, null, 'gold', '已售完');
+    renderEquipWarehouseList(c);
+  }
+
+  if(prepState.tab === 'skill'){
+    body.innerHTML = `<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">技能欄位（8格）</div>
+      <div class="slotgrid">` + c.skills.map((sk,i)=>{
+        const d = skillDefOf(sk);
+        const inst = skillInstOf(sk);
+        const maxed = inst && inst.level >= SKILL_UPGRADE_CAP;
+        const nextCost = inst ? skillUpgradeCost(inst.level+1) : 0;
+        return `<div class="slot ${d?'':'empty'}" style="${d?`--accent:${skillTypeColor(d.type)}`:''}">
+          <div class="k">格 ${i+1}${inst ? ` · Lv.${inst.level}` : ''}</div>
+          <div class="v">${d?d.name:'空位'}</div>
+          ${d ? `<div class="slot-effect">${skillSummaryText(d)}${inst && inst.level>1 ? `（強化中，power/heal再+${(inst.level-1)*SKILL_LEVEL_POWER_BONUS_PER_LEVEL}）` : ''}</div>` : ''}
+          ${sk ? `<button class="btn small" data-upgrade-skill="${i}" style="margin-top:4px;width:100%;" ${maxed || state.crystal<nextCost ? 'disabled':''}>${maxed ? '已滿級' : `強化 (${nextCost}水晶)`}</button>` : ''}
+          ${d ? `<button class="btn small" data-unequip-skill="${i}" style="margin-top:4px;width:100%;">卸除</button>` : ''}
+        </div>`;
+      }).join('') + `</div>
+      <div style="font-size:12px;color:var(--text-dim);margin:16px 0 8px;">技能商店（${SKILL_SHOP_KEYS.length}/9）</div>
+      <div class="slotgrid" id="skillShopGrid"></div>
+      <div style="font-size:12px;color:var(--text-dim);margin:16px 0 8px;">技能書倉庫（${Object.values(state.skillInstances).filter(i=>i.status==='owned').length}本）· owner限制已拿掉（設計文件第五節定案），任何角色都能裝上倉庫裡的技能書，除非該技能設了charReq限定</div>
+      <div id="skillWarehouseList"></div>`;
+    body.querySelectorAll('[data-unequip-skill]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const idx = parseInt(btn.dataset.unequipSkill);
+        const iid = c.skills[idx];
+        const inst = skillInstOf(iid);
+        if(inst) inst.status = 'owned';
+        c.skills[idx] = null;
+        toast('已卸除，收進技能書倉庫');
+        saveGame(); renderPrep();
+      };
+    });
+    body.querySelectorAll('[data-upgrade-skill]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const idx = parseInt(btn.dataset.upgradeSkill);
+        const inst = skillInstOf(c.skills[idx]);
+        if(!inst || inst.level >= SKILL_UPGRADE_CAP) return;
+        const cost = skillUpgradeCost(inst.level+1);
+        if(state.crystal < cost){ toast('水晶不足'); return; }
+        state.crystal -= cost;
+        inst.level++;
+        toast('已強化至 Lv.'+inst.level);
+        saveGame(); renderPrep();
+      };
+    });
+    const skillStockByKey = {};
+    Object.values(state.skillInstances).forEach(inst=>{ if(inst.status==='unowned') skillStockByKey[inst.key] = (skillStockByKey[inst.key]||0)+1; });
+    const alreadyKnownKeys = new Set(c.skills.filter(Boolean).map(iid=> skillInstOf(iid) && skillInstOf(iid).key).filter(Boolean));
+    const skillEntries = SKILL_SHOP_KEYS.map(k=>{ const d=SKILL_DB[k]; return [k, Object.assign({}, d, {cost:SKILL_SHOP_COST[k], desc:skillSummaryText(d), tagColor:skillTypeColor(d.type)})]; });
+    renderShopGrid('skillShopGrid', skillEntries, (key,it)=>{
+      if(!canUse(SKILL_DB[key], c.id)){ toast('此角色無法學習這個技能'); return; }
+      const emptyIdx = c.skills.findIndex(x=>!x);
+      if(emptyIdx<0){ toast('技能欄位已滿，無法學習新技能'); return; }
+      if(state.crystal < it.cost) return;
+      const iidToBuy = Object.keys(state.skillInstances).find(iid=> state.skillInstances[iid].key===key && state.skillInstances[iid].status==='unowned');
+      if(!iidToBuy){ toast('已售完'); return; }
+      state.crystal -= it.cost;
+      state.skillInstances[iidToBuy].status = 'equipped';
+      c.skills[emptyIdx] = iidToBuy;
+      toast('已學會 '+it.name);
+      saveGame(); renderPrep();
+    }, (key)=> alreadyKnownKeys.has(key) || !skillStockByKey[key], null, null, 'crystal', '已擁有/已售完');
+    renderSkillWarehouseList(c);
+  }
+
+  if(prepState.tab === 'item'){
+    body.innerHTML = `<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">道具欄位（8格）</div>
+    <div class="slotgrid">` + c.items.map((it,i)=>{
+      const d = itemDefOf(it);
+      return `<div class="slot ${d?'':'empty'}">
+        <div class="k">格 ${i+1}</div>
+        <div class="v">${d?d.name:'空位'}</div>
+        ${d ? `<div class="slot-effect">${itemSummaryText(d)}</div>` : ''}
+        ${d ? `<button class="btn small" data-unequip-item="${i}" style="margin-top:4px;width:100%;">卸除</button>` : ''}
+      </div>`;
+    }).join('') + `</div>
+      <div style="font-size:12px;color:var(--text-dim);margin:16px 0 8px;">道具商店（${Object.keys(ITEM_DB).length}/16，其餘格位保留給之後新增的道具）</div>
+      <div class="slotgrid" id="itemShopGrid"></div>
+      <div style="font-size:12px;color:var(--text-dim);margin:16px 0 8px;">共用道具倉庫（${Object.values(state.itemInstances).filter(i=>i.status==='owned').length}件）· 卸下的道具不分角色，任何人都能重新拿取，也可以直接賣出</div>
+      <div id="itemWarehouseList"></div>`;
+    body.querySelectorAll('[data-unequip-item]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const idx = parseInt(btn.dataset.unequipItem);
+        const iid = c.items[idx];
+        const inst = itemInstOf(iid);
+        if(inst) inst.status = 'owned';
+        c.items[idx] = null;
+        toast('已卸除，收進道具倉庫');
+        saveGame(); renderPrep();
+      };
+    });
+    const itemStockByKey = {};
+    Object.values(state.itemInstances).forEach(inst=>{ if(inst.status==='unowned') itemStockByKey[inst.key] = (itemStockByKey[inst.key]||0)+1; });
+    const itemEntries = Object.entries(ITEM_DB).map(([k,d])=> [k, Object.assign({}, d, {desc: itemSummaryText(d)})]);
+    renderShopGrid('itemShopGrid', itemEntries, (key,it)=>{
+      const emptyIdx = c.items.findIndex(x=>!x);
+      if(emptyIdx<0){ toast('道具欄已滿'); return; }
+      if(state.gold < it.cost) return;
+      const iidToBuy = Object.keys(state.itemInstances).find(iid=> state.itemInstances[iid].key===key && state.itemInstances[iid].status==='unowned');
+      if(!iidToBuy){ toast('已售完'); return; }
+      state.gold -= it.cost;
+      state.itemInstances[iidToBuy].status = 'equipped';
+      c.items[emptyIdx] = iidToBuy;
+      toast('已購買 '+it.name);
+      saveGame(); renderPrep();
+    }, (key)=> !itemStockByKey[key], 16, null, 'gold', '已售完');
+    renderItemWarehouseList(c);
+  }
+
+  if(prepState.tab === 'stat'){
+    const armorBonus = Object.values(c.equipment).reduce((a,iid)=> a + equipEffectiveStat(iid,'armor'), 0);
+    const defBonus = Object.values(c.equipment).reduce((a,iid)=> a + equipEffectiveStat(iid,'def'), 0) + trainingBonus(c,'def');
+    const atkBonus = Object.values(c.equipment).reduce((a,iid)=> a + equipEffectiveStat(iid,'atk'), 0) + trainingBonus(c,'atk');
+    const spdBonus = Object.values(c.equipment).reduce((a,iid)=> a + equipEffectiveStat(iid,'spd'), 0);
+    const hpBonus = trainingBonus(c,'hp');
+    const spBonus = trainingBonus(c,'sp');
+
+    const expNeed = c.level < 20 ? LEVEL_GROWTH_TABLE[c.level+1] : null;
+    const lvMaxed = c.level >= 20;
+
+    // 統一用跟裝備/技能/道具同一套 .slot/.slotgrid 元件，卡片外觀/大小完全一致，
+    // 只是內容換成屬性鍛鍊用的數值/按鈕（比照equip tab「等級+強化按鈕」那套排法）
+    function trainSlot(key, label, tagColor, curValue){
+      const trained = c.training[key];
+      const maxed = trained >= ATTR_TRAIN_CAP;
+      const cost = attrTrainCost(trained);
+      return `<div class="slot" style="--accent:${tagColor}">
+        <div class="slot-tagdot" style="background:${tagColor}"></div>
+        <div class="k">${label}${trained>0?` · +${trained}`:''}</div>
+        <div class="v">${curValue}</div>
+        <div class="slot-effect">${maxed ? '已達上限' : `花費 ${cost} 天賦天球`}</div>
+        <button class="btn small" data-train="${key}" style="margin-top:4px;width:100%;" ${maxed || state.sphere<cost ? 'disabled':''}>${maxed?'已封頂':'鍛鍊 +1'}</button>
+      </div>`;
+    }
+
+    body.innerHTML = `
+
+<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">屬性欄位（8格）</div>
+
+<div class="slotgrid">
+        <div class="slot" style="--accent:var(--attr-lv)">
+          <div class="slot-tagdot" style="background:var(--attr-lv)"></div>
+          <div class="k">LV等級</div>
+          <div class="v">Lv.${c.level}</div>
+          <div class="slot-effect">經驗 ${state.expPool}${expNeed?`/${expNeed}`:''}</div>
+          <button class="btn small" id="levelUpBtn" style="margin-top:4px;width:100%;" ${lvMaxed || !expNeed || state.expPool<expNeed ? 'disabled':''}>${lvMaxed?'已封頂':'升級'}</button>
+        </div>
+        ${trainSlot('hp','HP生命','var(--hp)', c.maxHp+hpBonus)}
+        ${trainSlot('sp',c.resName,'var(--attr-sp)', c.resMax+spBonus)}
+        <div class="slot empty"><div class="k">暫定</div><div class="v">未來屬性</div></div>
+        ${trainSlot('atk','ATK攻擊','var(--attr-atk)', c.atk+atkBonus)}
+        ${trainSlot('def','DEF防禦','var(--attr-def)', c.def+defBonus)}
+        <div class="slot empty"><div class="k">暫定</div><div class="v">未來屬性</div></div>
+        <div class="slot empty"><div class="k">暫定</div><div class="v">未來屬性</div></div>
+      </div>
+      <div class="stat-row"><span class="k">速度</span><span class="v">${c.spd + spdBonus}</span></div>
+      <div class="stat-row"><span class="k">鎧甲值</span><span class="v">${c.armor + armorBonus}</span></div>
+
+      <div style="font-size:12px;color:var(--text-dim);margin:16px 0 8px;">寶物庫（${Object.keys(TREASURY_DB).length}/8，稀有特殊物品，其餘格位待未來擴充）</div>
+      <div class="slotgrid" id="treasuryGrid"></div>
+    `;
+    const levelUpBtn = document.getElementById('levelUpBtn');
+    if(levelUpBtn) levelUpBtn.onclick = ()=>{
+      if(c.level >= 20 || state.expPool < LEVEL_GROWTH_TABLE[c.level+1]) return;
+      state.expPool -= LEVEL_GROWTH_TABLE[c.level+1];
+      c.level++;
+      toast(c.name+' 升到 Lv.'+c.level);
+      saveGame(); renderPrep();
+    };
+    body.querySelectorAll('[data-train]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const key = btn.dataset.train;
+        const trained = c.training[key];
+        if(trained >= ATTR_TRAIN_CAP) return;
+        const cost = attrTrainCost(trained);
+        if(state.sphere < cost){ toast('天賦天球不足'); return; }
+        state.sphere -= cost;
+        c.training[key]++;
+        toast(c.name+' 的 '+key.toUpperCase()+' 鍛鍊 +1');
+        saveGame(); renderPrep();
+      };
+    });
+    const treasuryStockByKey = {};
+    Object.values(state.equipInstances).forEach(inst=>{ if(inst.status==='unowned' && TREASURY_DB[inst.key]) treasuryStockByKey[inst.key] = (treasuryStockByKey[inst.key]||0)+1; });
+    const treasuryEntries = Object.entries(TREASURY_DB).map(([k,d])=> [k, Object.assign({}, d, {desc: equipSummaryText(d)})]);
+    renderShopGrid('treasuryGrid', treasuryEntries, (key,it)=>{
+      if(state.gold < it.cost) return;
+      const iidToBuy = Object.keys(state.equipInstances).find(iid=> state.equipInstances[iid].key===key && state.equipInstances[iid].status==='unowned');
+      if(!iidToBuy){ toast('已售完'); return; }
+      state.gold -= it.cost;
+      const slot = ['acc1','acc2','acc3'].find(s=>!c.equipment[s]) || 'acc1';
+      if(c.equipment[slot]){
+        const oldInst = equipInstOf(c.equipment[slot]);
+        if(oldInst) oldInst.status = 'owned'; // 原本飾品格滿時，舊飾品改存進倉庫而不是直接消失
+      }
+      state.equipInstances[iidToBuy].status = 'equipped';
+      c.equipment[slot] = iidToBuy;
+      toast('已裝備 '+it.name);
+      saveGame(); renderPrep();
+    }, (key)=> !treasuryStockByKey[key], 8, null, 'gold', '已售完');
+  }
+}
+
+/* 共用裝備倉庫清單（顯示在裝備分頁下方）。賣出＝狀態改回unowned回到商店庫存，
+   不是永久刪除，同一個iid之後還能被買回（MOMO確認過：賣不賣其實沒差，重點是不會憑空消失） */
+function renderEquipWarehouseList(c){
+  const list = document.getElementById('equipWarehouseList');
+  if(!list) return;
+  const owned = Object.entries(state.equipInstances).filter(([iid,inst])=> inst.status==='owned');
+  if(owned.length === 0){
+    list.innerHTML = `<div class="inv-empty">倉庫是空的。</div>`;
+    return;
+  }
+  list.innerHTML = '';
+  owned.forEach(([iid,inst])=>{
+    const it = lookupEquip(inst.key);
+    if(!it) return; // 保險：找不到對應資料就跳過，避免畫面壞掉
+    const sellPrice = Math.floor(it.cost/2);
+    const row = document.createElement('div');
+    row.className = 'inv-item';
+    row.innerHTML = `<div><div class="n">${it.name}</div><div class="d">${equipSummaryText(it)}</div></div>`;
+    const btnWrap = document.createElement('div');
+    btnWrap.style.display = 'flex';
+    btnWrap.style.gap = '6px';
+    const equipBtn = document.createElement('button');
+    equipBtn.className = 'btn small';
+    equipBtn.textContent = '裝到 '+c.name;
+    equipBtn.onclick = ()=>{
+      const slot = it.slot === 'acc' ? (['acc1','acc2','acc3'].find(s=>!c.equipment[s])) : (c.equipment[it.slot] ? null : it.slot);
+      if(!slot){ toast('對應的裝備部位已滿，請先卸除'); return; }
+      inst.status = 'equipped';
+      c.equipment[slot] = iid;
+      toast('已從倉庫裝上 '+it.name);
+      saveGame(); renderPrep();
+    };
+    const sellBtn = document.createElement('button');
+    sellBtn.className = 'btn small';
+    sellBtn.textContent = '賣出 '+sellPrice+' 金';
+    sellBtn.onclick = ()=>{
+      inst.status = 'unowned'; // 賣出＝回到商店庫存，不是永久消失，之後同一個iid還能被買回
+      state.gold += sellPrice;
+      toast('已賣出，獲得 '+sellPrice+' 金幣');
+      saveGame(); renderPrep();
+    };
+    btnWrap.appendChild(equipBtn);
+    btnWrap.appendChild(sellBtn);
+    row.appendChild(btnWrap);
+    list.appendChild(row);
+  });
+}
+
+/* 共用道具倉庫清單（顯示在道具分頁下方）。賣出＝狀態改回unowned回到商店庫存，不是永久刪除 */
+function renderItemWarehouseList(c){
+  const list = document.getElementById('itemWarehouseList');
+  if(!list) return;
+  const owned = Object.entries(state.itemInstances).filter(([iid,inst])=> inst.status==='owned');
+  if(owned.length === 0){
+    list.innerHTML = `<div class="inv-empty">道具倉庫是空的。</div>`;
+    return;
+  }
+  list.innerHTML = '';
+  owned.forEach(([iid,inst])=>{
+    const it = ITEM_DB[inst.key];
+    if(!it) return;
+    const sellPrice = Math.floor(it.cost/2);
+    const row = document.createElement('div');
+    row.className = 'inv-item';
+    row.innerHTML = `<div><div class="n">${it.name}</div><div class="d">${itemSummaryText(it)}</div></div>`;
+    const btnWrap = document.createElement('div');
+    btnWrap.style.display = 'flex';
+    btnWrap.style.gap = '6px';
+    const takeBtn = document.createElement('button');
+    takeBtn.className = 'btn small';
+    takeBtn.textContent = '拿給 '+c.name;
+    takeBtn.onclick = ()=>{
+      const emptyIdx = c.items.findIndex(x=>!x);
+      if(emptyIdx<0){ toast('道具欄已滿，請先卸除'); return; }
+      inst.status = 'equipped';
+      c.items[emptyIdx] = iid;
+      toast('已從倉庫取出 '+it.name);
+      saveGame(); renderPrep();
+    };
+    const sellBtn = document.createElement('button');
+    sellBtn.className = 'btn small';
+    sellBtn.textContent = '賣出 '+sellPrice+' 金';
+    sellBtn.onclick = ()=>{
+      inst.status = 'unowned'; // 賣出＝回到商店庫存，不是永久消失，之後同一個iid還能被買回
+      state.gold += sellPrice;
+      toast('已賣出，獲得 '+sellPrice+' 金幣');
+      saveGame(); renderPrep();
+    };
+    btnWrap.appendChild(takeBtn);
+    btnWrap.appendChild(sellBtn);
+    row.appendChild(btnWrap);
+    list.appendChild(row);
+  });
+}
+
+/* 技能書倉庫清單（顯示在技能分頁下方）。owner限制已拿掉（設計文件第五節），
+   改成用 canUse()／charReq 判斷這個角色能不能裝，不再侷限「只能裝回原本卸下的那個人」 */
+function renderSkillWarehouseList(c){
+  const list = document.getElementById('skillWarehouseList');
+  if(!list) return;
+  const owned = Object.entries(state.skillInstances).filter(([iid,inst])=> inst.status==='owned' && canUse(SKILL_DB[inst.key], c.id));
+  if(owned.length === 0){
+    list.innerHTML = `<div class="inv-empty">倉庫裡沒有 ${c.name} 能使用的技能書。</div>`;
+    return;
+  }
+  list.innerHTML = '';
+  owned.forEach(([iid,inst])=>{
+    const d = SKILL_DB[inst.key];
+    if(!d) return;
+    const row = document.createElement('div');
+    row.className = 'inv-item';
+    row.innerHTML = `<div><div class="n">${d.name}</div><div class="d">${skillSummaryText(d)}</div></div>`;
+    const btnWrap = document.createElement('div');
+    btnWrap.style.display = 'flex';
+    btnWrap.style.gap = '6px';
+    const equipBtn = document.createElement('button');
+    equipBtn.className = 'btn small';
+    equipBtn.textContent = '裝回 '+c.name;
+    equipBtn.onclick = ()=>{
+      const emptyIdx = c.skills.findIndex(x=>!x);
+      if(emptyIdx<0){ toast('技能欄位已滿，請先卸除'); return; }
+      inst.status = 'equipped';
+      c.skills[emptyIdx] = iid;
+      toast('已從倉庫裝上 '+d.name);
+      saveGame(); renderPrep();
+    };
+    btnWrap.appendChild(equipBtn);
+    row.appendChild(btnWrap);
+    list.appendChild(row);
+  });
+}
+
+/* ============================================================
+   通用商店格狀渲染
+   entries: [[key, itemData], ...]
+   onBuy(key, itemData)：點擊購買時執行
+   ownedCheckFn(key)：可選，若回傳true，該格會顯示soldOutLabel且不可購買
+     （原本語意是「已擁有」，現在庫存交給個體實例的unowned數量決定，
+     所以這裡的意思改成「沒有庫存可買了」，文字用soldOutLabel控制）
+   totalSlots：格子總數（含尚未上架的空格），預設等於entries數量
+   soldOutLabel：售完時按鈕文字，預設'已擁有'（相容舊呼叫），新的呼叫可傳'已售完'
+============================================================ */
+function renderShopGrid(containerId, entries, onBuy, ownedCheckFn, totalSlots, extraLookup, currency, soldOutLabel){
+  const grid = document.getElementById(containerId);
+  if(!grid) return;
+  currency = currency || 'gold'; // 'gold' 或 'crystal'，決定這個商店格用哪種貨幣顯示/扣款
+  const currencyLabel = currency === 'crystal' ? '水晶' : '金';
+  const currencyShortage = currency === 'crystal' ? '水晶不足' : '金幣不足';
+  soldOutLabel = soldOutLabel || '已擁有';
+  const slotCount = totalSlots || entries.length;
+  for(let i=0;i<slotCount;i++){
+    if(i >= entries.length){
+      const div = document.createElement('div');
+      div.className = 'slot empty';
+      div.innerHTML = `<div class="k">格 ${i+1}</div><div class="v">尚未上架</div>`;
+      grid.appendChild(div);
+      continue;
+    }
+    const [key, it] = entries[i];
+    const owned = ownedCheckFn ? ownedCheckFn(key) : false;
+    const div = document.createElement('div');
+    div.className = 'slot';
+    if(it.tagColor) div.style.setProperty('--accent', it.tagColor); // 左側色條跟右上角圓點吃同一個顏色值
+    div.innerHTML = `${it.tagColor ? `<div class="slot-tagdot" style="background:${it.tagColor}"></div>` : ''}<div class="k">${it.cost} ${currencyLabel}</div><div class="v">${it.name}</div>${it.desc ? `<div class="slot-effect">${it.desc}</div>` : ''}`;
+    const btn = document.createElement('button');
+    btn.className = 'btn small';
+    btn.style.marginTop = '4px';
+    btn.style.width = '100%';
+    if(owned){ btn.textContent = soldOutLabel; btn.disabled = true; }
+    else if(state[currency] < it.cost){ btn.textContent = currencyShortage; btn.disabled = true; }
+    else { btn.textContent = '購買'; btn.onclick = ()=> onBuy(key, it); }
+    div.appendChild(btn);
+    grid.appendChild(div);
+  }
+}
+
+/* ============================================================
+   BATTLE SETUP DATA
+
+   【怎麼新增一隻新敵人】
+   在 ENEMY_TEMPLATES 裡複製一行，改成你要的內容：
+   敵人key: ()=> ({
+     id:nextEnemyId('你取的前綴'),  // 前綴自己取，用 nextEnemyId() 生成保證不重複的id
+                                     // （dev4起改用遞增計數器，取代舊版的 Date.now()，
+                                     //  避免同一毫秒內連續召喚同模板敵人時id意外重複）
+     portraitKey:'立繪對照用的固定名稱',  // 立繪系統靠這個找圖，同種敵人共用一個就好
+     name:'顯示在畫面上的名字',
+     side:'enemy',
+     hp:20, maxHp:20,               // 生命值
+     atk:6, def:1,                  // 攻擊/防禦
+     spd:10,                        // 速度（影響行動順序）
+     armor:0,                       // 鎧甲值（傷害門檻，先前討論過的機制）
+     resName:'-', res:0, resMax:0,  // 沒有特殊資源的敵人維持這樣即可
+     skills:['goblin_hit'],         // 這隻敵人會用的技能key，要對應 SKILL_DB 裡已存在的技能
+     alive:true,
+   }),
+
+   【怎麼組一場新戰鬥】
+   在 BATTLES 裡複製一筆，key（例如 goblin_patrol）就是章節資料
+   CHAPTERS 陣列裡 battle: 要填的值：
+   你取的戰鬥key: {
+     name:'戰鬥名稱（給自己看，不一定會顯示）',
+     isBoss:false,                  // true 的話會播放Boss戰音樂
+     bg:'bg002.png',                // 戰鬥背景圖檔名
+     enemies: ()=> [ ENEMY_TEMPLATES.敵人key(), ENEMY_TEMPLATES.敵人key() ],
+     // ⚠️ enemies 務必寫成函式（()=> [...]），不要直接寫死陣列！
+     //    這樣每次玩家挑戰這場戰鬥，才會即時執行 ENEMY_TEMPLATES 產生全新的敵人實例與id，
+     //    如果寫死陣列，敵人只會在遊戲一開始就固定好，重複挑戰同一場戰鬥時id會一直重複沿用。
+     unlockFlag:'打贏後要設定的旗標名稱（可省略，沒有就不設定旗標）',
+   }
+============================================================ */
+// 敵人id生成器：改用遞增計數器取代 Date.now()，避免同一毫秒內連續召喚同模板敵人時id碰撞
+// 用法：呼叫 nextEnemyId('前綴') 即可拿到保證不重複的id，例如 nextEnemyId('goblin') -> 'goblin_0', 'goblin_1'...
+let __enemySpawnCounter = 0;
+function nextEnemyId(prefix){ return prefix + '_' + (__enemySpawnCounter++); }
+
+// 顯示名稱用的字母編號計數器（跟 nextEnemyId 的id計數器分開，只負責「哥布林A/B/C...」這種顯示用命名）
+let __goblinNameCounter = 0;
+
+const ENEMY_TEMPLATES = {
+  // 原本 goblinA / goblinB 是各自寫死一份幾乎相同的資料，只差name字串，
+  // 現在合併成單一模板，每次呼叫自動產生遞增字母（哥布林A、哥布林B...），
+  // 不管戰場上要出現幾隻，都只需要維護這一份資料
+  goblin: ()=> ({ id:nextEnemyId('goblin'), portraitKey:'goblin', name:'哥布林'+String.fromCharCode(65+(__goblinNameCounter++ % 26)), side:'enemy', hp:20,maxHp:20, atk:6, def:1, spd:10, armor:0, resName:'-', res:0, resMax:0, skills:['goblin_hit'], alive:true }),
+  goblinShaman: ()=> ({ id:nextEnemyId('goblinShaman'), portraitKey:'goblin', name:'哥布林薩滿', side:'enemy', hp:16,maxHp:16, atk:4, def:1, spd:10, armor:0, resName:'-', res:0, resMax:0, skills:['goblin_hit','goblin_heal'], alive:true }),
+};
+
+const BATTLES = {
+  goblin_patrol: {
+    name:'哥布林巡邏隊', isBoss:false, bg:'bg002.png',
+    // enemies 改成函式：每次 startBattle() 呼叫這個函式時才真正執行 ENEMY_TEMPLATES 生成新的敵人實例，
+    // 不是網頁載入時就固定好——這樣重複挑戰同一場戰鬥時，每次的敵人id才會是全新的，
+    // 不會沿用上一次挑戰時的舊id（之前的寫法是陣列在BATTLES物件建立當下就執行完畢，導致重複開戰id永遠一樣）
+    enemies: ()=> [ ENEMY_TEMPLATES.goblin(), ENEMY_TEMPLATES.goblin(), ENEMY_TEMPLATES.goblinShaman(), ENEMY_TEMPLATES.goblinShaman() ],
+    unlockFlag:'defeated_goblin_patrol',
+  }
+};
+
+/* ============================================================
+   BATTLE STATE
+============================================================ */
+let battle = null;
+
+// 行動順序規則開關：
+//   true  = 每回合都重新擲速度排序（原本的行為，速度快的人不保證每回合都排前面，因為有隨機值）
+//   false = 只有第1回合擲一次排序，之後每回合都照第1回合定下的順序走（速度快的人永遠排在同一位置）
+// 想切換時只要改這一行的 true/false 即可，其餘程式碼不用動。
+const REROLL_ORDER_EACH_ROUND = false;
+
+function startBattle(battleKey, chapterId){
+  if(state.party.filter(p=>p.active).length === 0){
+    toast('請先在準備畫面選擇至少1名角色上場');
+    return;
+  }
+  const def = BATTLES[battleKey];
+  __goblinNameCounter = 0; // 每次開戰重置顯示名稱計數器，讓哥布林命名固定從A開始，不會累計到上次挑戰的字母
+  const allies = state.party.filter(p=>p.active).map(p=>({
+    id:p.id, name:p.name, side:'ally', ref:p,
+    hp:p.hp, maxHp:p.maxHp + trainingBonus(p,'hp'),
+    atk:p.atk + equipBonus(p,'atk') + trainingBonus(p,'atk'), def:p.def + equipBonus(p,'def') + trainingBonus(p,'def'),
+    spd:p.spd + equipBonus(p,'spd'), armor:p.armor + equipBonus(p,'armor'),
+    resName:p.resName, res:p.resMax + trainingBonus(p,'sp'), resMax:p.resMax + trainingBonus(p,'sp'),
+    skills:p.skills.filter(Boolean).map(iid=>{ const inst = skillInstOf(iid); return inst ? inst.key : null; }).filter(Boolean),
+    skillLevels: (()=>{ // 每個技能key目前的強化等級，供executeSkill算加成用
+      const m = {};
+      p.skills.filter(Boolean).forEach(iid=>{ const inst = skillInstOf(iid); if(inst) m[inst.key] = inst.level; });
+      return m;
+    })(),
+    items:p.items.filter(Boolean).map(iid=>{ const inst = itemInstOf(iid); return inst ? inst.key : null; }).filter(Boolean),
+    alive:true, x:-1,y:-1, cooldowns:{},
+  }));
+  const enemies = def.enemies().map(e=> Object.assign({}, e, {x:-1,y:-1, cooldowns:{}, items:[]}));
+
+  // place on grid: allies col 0-1, enemies col 10-11
+  allies.forEach((u,i)=>{ u.x = i%2; u.y = i<2?i:i-2; });
+  // fix positions properly: 上場人數不固定4人，依實際上場名單排列，最多4排
+  allies.forEach((u,i)=>{ u.x = 0; u.y = i; });
+  enemies.forEach((u,i)=>{ u.x = 11; u.y = i; });
+
+  battle = {
+    def, allies, enemies,
+    chapterId: chapterId != null ? chapterId : null,
+    round: 1,
+    order: [],
+    orderIdx: 0,
+    log: [],
+    selected: { skill:null, mode:null }, // mode: 'move'|'skill'|'inspect'（普通攻擊已併入技能系統，不再有獨立的'attack'模式）
+    finished:false,
+    floorItems: {}, // 場上可拾取物品，key格式 "x,y" -> ITEM_DB的鍵名
+  };
+  seedFloorItems(); // 測試用：戰鬥開始時在空地上隨機灑幾樣可撿的物品
+  rollOrder();
+  startActorTurn(currentActor()); // 第一位行動者的三旗標名額初始化
+  playBgm(def.isBoss ? 'Kawaii_Dimension_.mp3' : 'Just_Started.mp3');
+  switchView('battle');
+  setNavLocked(true);
+  renderBattle();
+}
+
+function allUnits(){
+  return battle.allies.concat(battle.enemies);
+}
+function aliveUnits(){
+  return allUnits().filter(u=>u.hp>0 || u.downButAlive); // hp<=0 units stay but skip turn
+}
+function equipBonus(p, key){
+  return Object.values(p.equipment).reduce((a,iid)=> a + equipEffectiveStat(iid, key), 0);
+}
+
+function rollOrder(){
+  const units = allUnits();
+  units.forEach(u=>{ u._speedRoll = u.spd + 1 + Math.floor(Math.random()*20); });
+  battle.order = units.slice().sort((a,b)=> b._speedRoll - a._speedRoll);
+  battle.orderIdx = 0;
+}
+
+function currentActor(){
+  return battle.order[battle.orderIdx];
+}
+
+function logMsg(html){
+  battle.log.push(html);
+  if(battle.log.length > 100) battle.log.shift();
+}
+
+function playBgm(file){
+  const bgm = document.getElementById('bgm');
+  if(bgm.getAttribute('data-cur') === file) return;
+  bgm.src = file;
+  bgm.setAttribute('data-cur', file);
+  bgm.volume = 0.35;
+  bgm.play().catch(()=>{});
+}
+
+/* ============================================================
+   BATTLE RENDER
+============================================================ */
+function renderBattle(){
+  const el = document.getElementById('viewBattle');
+  const bg = battle.def.bg;
+  el.innerHTML = `
+    <div class="battle-wrap">
+      <div class="battle-layout">
+          <!--
+        <div class="portrait-box" id="portraitAlly">
+          <div class="portrait-placeholder">我方立繪<br>（尚未設定圖片）</div>
+          -->
+        </div>
+        <div class="battle-top-zone">
+          <div class="battle-bg" style="background-image:url('${bg}');"></div>
+          <div class="battle-top">
+            <div class="turn-order">
+              <div class="lbl">第 ${battle.round} 回合 · 行動順序</div>
+              <div class="row" id="orderRow"></div>
+            </div>
+          </div>
+          <div class="grid-wrap"><div class="grid" id="grid"></div></div>
+        </div>
+
+        <!--
+        <div class="portrait-box" id="portraitEnemy">
+          <div class="portrait-placeholder">敵方立繪<br>（尚未設定圖片）</div>
+        </div>
+        -->
+
+      </div>
+      <div class="side-panel" id="sidePanel"></div>
+      <div class="logbar"><span id="logCount">紀錄 0/100</span><button class="btn small" id="btnLogToggle">展開紀錄</button></div>
+      <div class="msglog" id="msglog"></div>
+    </div>
+  `;
+  document.getElementById('btnLogToggle').onclick = toggleLog;
+  renderOrderRow();
+  renderGrid();
+  renderSidePanel();
+  renderPortraits();
+  renderLog(false);
+  checkBattleEnd();
+  maybeRunEnemyTurn();
+}
+
+/* ============================================================
+   角色立繪
+   之後想接圖片：在 PORTRAIT_MAP 裡依「基準key_技能key」對應圖片檔名，
+   renderPortraits() 會依目前選取的技能自動切換要顯示的圖
+
+   ⚠️ 我方角色（daren/sete/guran/shiyi）id是固定的，直接用id當基準key即可。
+   ⚠️ 敵人的id每次戰鬥開始都會重新產生（用遞增計數器生成，避免同名敵人衝突），
+      所以敵人不能直接用id對照立繪，必須額外指定 portraitKey（在
+      ENEMY_TEMPLATES 裡設定，例如哥布林不管生成幾隻都給 portraitKey:'goblin'，
+      這樣不管是哪一隻、第幾次戰鬥，都能穩定對到同一張 goblin_default.png）
+============================================================ */
+const PORTRAIT_MAP = {
+  'daren_default': 'assets/portraits/daren_default.png',
+  'sete_default': 'assets/portraits/sete_default.png',
+  'guran_default': 'assets/portraits/guran_default.png',
+  'shiyi_default': 'assets/portraits/shiyi_default.png',
+
+  // 平常狀態立繪（準備畫面用，跟上面戰鬥用的_default是兩張不同圖）
+  'daren_normal': 'assets/portraits/daren_normal.png',
+  'sete_normal': 'assets/portraits/sete_normal.png',
+  'guran_normal': 'assets/portraits/guran_normal.png',
+  'shiyi_normal': 'assets/portraits/shiyi_normal.png',
+
+  'goblin_default': 'assets/portraits/goblin_default.png',
+
+
+
+  // 範例格式（目前皆未提供圖片檔，先留空）：
+  // 'daren_guard': 'daren_guard.png',
+  // 'guran_song_heal': 'guran_song_heal.png',
+};
+/* 準備畫面用的「平常狀態」立繪，跟下面 renderPortraits() 的戰鬥立繪是分開的函式，
+   因為戰鬥立繪還要處理「依選取的技能切換圖片」那套邏輯，準備畫面不需要 */
+function prepPortraitHtml(c){
+  const imgFile = PORTRAIT_MAP[c.id + '_normal'];
+  if(imgFile) return `<img src="${imgFile}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+  return `<div class="portrait-placeholder">${c.name}<br><span style="opacity:.6;">(${c.id}_normal)</span><br>尚未設定圖片</div>`;
+}
+function renderPortraits(){
+  const actor = currentActor();
+  if(!actor) return;
+  const allyBox = document.getElementById('portraitAlly');
+  const enemyBox = document.getElementById('portraitEnemy');
+  if(!allyBox || !enemyBox) return;
+
+  function portraitHtml(unit, defaultLabel){
+    if(!unit) return `<div class="portrait-placeholder">${defaultLabel}<br>（尚未設定圖片）</div>`;
+    const skillKey = (battle.selected.mode === 'skill' && battle.selected.skillKey) ? battle.selected.skillKey : 'default';
+    // 優先用 portraitKey（固定不變，敵人專用），沒有的話才退回用 id（我方角色固定，敵人id每次戰鬥會變動不可靠）
+    const baseKey = unit.portraitKey || unit.id;
+    const mapKey = baseKey + '_' + skillKey;
+    const imgFile = PORTRAIT_MAP[mapKey] || PORTRAIT_MAP[baseKey + '_default'];
+    if(imgFile){
+      return `<img src="${imgFile}" style="width:100%;border-radius:8px;">`;
+    }
+    return `<div class="portrait-placeholder">${unit.name}<br><span style="opacity:.6;">(${mapKey})</span><br>尚未設定圖片</div>`;
+  }
+
+  const currentAlly = actor.side === 'ally' ? actor : null;
+  const currentEnemy = actor.side === 'enemy' ? actor : null;
+  allyBox.innerHTML = portraitHtml(currentAlly, '我方立繪');
+  enemyBox.innerHTML = portraitHtml(currentEnemy, '敵方立繪');
+}
+
+function renderOrderRow(){
+  const row = document.getElementById('orderRow');
+  row.innerHTML = '';
+  battle.order.forEach((u,i)=>{
+    const down = u.hp<=0;
+    const div = document.createElement('div');
+    div.className = 'tu ' + (u.side) + (i===battle.orderIdx?' current':'') + (down?' dead':'');
+    div.textContent = u.name.slice(-1);
+    div.title = u.name + (down?'（倒下）':'');
+    row.appendChild(div);
+  });
+}
+
+function renderGrid(){
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  const cells = [];
+  for(let y=0;y<4;y++){
+    for(let x=0;x<12;x++){
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.x = x; cell.dataset.y = y;
+      grid.appendChild(cell);
+      cells.push(cell);
+    }
+  }
+  const actor = currentActor();
+  const sel = battle.selected;
+
+  // highlight selectable（移動：黃底候選格）
+  if(sel.mode === 'move'){
+    computeValidCells().forEach(([x,y])=>{
+      const c = cells[y*12+x];
+      if(c) c.classList.add('selectable');
+    });
+  } else if(sel.mode === 'skill' && sel.skillDef){
+    // 【施放預覽】規則見 dev4_design_todo.md 第十節收尾討論：
+    // shape===1／self：不標格子，改在 unit-chip 上標紅（下方單位迴圈處理）
+    // shape==='all'：全場標黃（純視覺表示「這是全場技能」），目標單位另外標紅
+    // shape>1（AOE）：候選錨點格標黃；若已選定錨點（sel.anchor），該錨點展開的N×N範圍額外標紅（三點式流程的第二步預覽）
+    // shape==='laser'：8個方向沿途格子分別標黃/紅（紅=這個方向線上有合法目標），點格子=選定方向直接發動，見 resolveLaserDirection()
+    const { yellow, red } = computeSkillHighlights(actor, sel.skillDef, sel);
+    yellow.forEach(([x,y])=>{
+      const c = cells[y*12+x];
+      if(c) c.classList.add('selectable');
+    });
+    red.forEach(([x,y])=>{
+      const c = cells[y*12+x];
+      if(c) c.classList.add('aoe');
+    });
+  }
+  cells.forEach(c=>{
+    c.onclick = ()=> onCellClick(parseInt(c.dataset.x), parseInt(c.dataset.y));
+  });
+
+  // 標示場上有可拾取物品的格子
+  Object.keys(battle.floorItems || {}).forEach(key=>{
+    const [lx, ly] = key.split(',').map(Number);
+    const cell = cells[ly*12+lx];
+    if(!cell) return;
+    const star = document.createElement('div');
+    star.className = 'loot-star';
+    star.textContent = '★';
+    star.title = '這裡有東西可以撿';
+    cell.appendChild(star);
+  });
+
+  // 這次選取狀態下，哪些單位屬於「合法目標」要標紅底
+  // - skill：shape===1的單體/自身、shape==='all'的全體、shape==='laser'的（8方向union）
+  // - flee：僅自己（脫逃改成需要點自己的unit-chip confirm，避免誤觸）
+  // - item：自己＋相鄰隊友（reach:1的targetSide:'ally'，自己距離自己是0一定會被singleTargetCandidates含進來，不用另外處理）
+  let redTargetUnits = [];
+  if(sel.mode === 'skill' && sel.skillDef){
+    const d = sel.skillDef;
+    if(d.shape === 1){
+      redTargetUnits = singleTargetCandidates(actor, d);
+    } else if(d.shape === 'all'){
+      redTargetUnits = allUnits().filter(u=> matchesSide(u, actor, d.targetSide));
+    } else if(d.shape === 'laser'){
+      const s = new Set();
+      LASER_DIRECTIONS.forEach(dir=>{
+        laserTargets(actor, d, dir.dx, dir.dy).forEach(u=> s.add(u));
+      });
+      redTargetUnits = Array.from(s);
+    }
+  } else if(sel.mode === 'flee'){
+    redTargetUnits = [actor];
+  } else if(sel.mode === 'item'){
+    redTargetUnits = singleTargetCandidates(actor, { targetSide:'ally', reach:1 });
+  }
+
+  // 【射程(黃)/生效(紅)統一】redTargetUnits是「真的會生效」的單位清單，
+  // 不論來自哪個mode（技能/脫逃/道具），一律把他們站的那一格背景染紅（跟AOE/laser同一套視覺語言），
+  // 不是只在unit-chip上加外框——外框（下面chip迴圈的target-red）保留當作疊加的加強提示，兩者並存。
+  redTargetUnits.forEach(u=>{
+    const c = cells[u.y*12+u.x];
+    if(c) c.classList.add('aoe');
+  });
+
+  allUnits().forEach(u=>{
+    if(u.x<0) return;
+    const cell = cells[u.y*12+u.x];
+    if(!cell) return;
+    const chip = document.createElement('div');
+    const isRedTarget = redTargetUnits.includes(u);
+    chip.className = 'unit-chip ' + u.side + (u===currentActor()?' current':'') + (u.hp<=0?' down':'') + (isRedTarget?' target-red':'');
+    chip.textContent = u.name.slice(-2);
+    chip.title = u.name;
+    const hpPct = clamp(u.hp/u.maxHp*100,0,100);
+    chip.innerHTML = `<span>${u.name.slice(-2)}</span><div class="unit-hp"><div style="width:${hpPct}%;"></div></div>`;
+    if(u._bubble){
+      const b = document.createElement('div');
+      b.className = 'bubble';
+      b.textContent = u._bubble;
+      chip.appendChild(b);
+    }
+    chip.onclick = (e)=>{ e.stopPropagation(); onUnitClick(u); };
+    cell.appendChild(chip);
+  });
+}
+
+function computeValidCells(){
+  const actor = currentActor();
+  const out = [];
+  for(let y=0;y<4;y++) for(let x=0;x<12;x++){
+    const dist = Math.abs(x-actor.x)+Math.abs(y-actor.y);
+    if(dist>=1 && dist<=actor.movePts && !unitAt(x,y)) out.push([x,y]);
+  }
+  return out;
+}
+
+/* 【射程(黃)/生效(紅)統一】算出目前skill選取狀態下，棋盤格要標黃/標紅的清單。
+   黃＝reach（打得到哪裡，純視覺，不代表點下去有反應）；紅＝實際生效的格子（redTargetUnits換算成座標後疊加，見renderGrid）。
+   這裡的shape分支對應的就是SKILL_DB上方【施放確認階段】註解裡的階段B/C，可以對照著看。
+   shape>1（AOE）：候選錨點黃、已選錨點的N×N範圍紅（階段C，第一次確認＝選錨點）
+   shape==='all'：全場黃（reach概念上就是整個棋盤）（階段B）
+   shape==='laser'：8個方向的沿途格子，該方向有合法目標就整條標紅，沒有就標黃（可以空放）（階段B）
+   shape===1／self：reach範圍格子標黃，跟AOE共用同一顆anchorCellCandidates()；
+     實際目標那一格的紅底不在這裡算，統一在renderGrid()的redTargetUnits→格子紅底那一步處理，避免重複邏輯（階段B）。 */
+function computeSkillHighlights(actor, d, sel){
+  const yellow = [];
+  const red = [];
+  if(!d) return { yellow, red };
+  if(d.shape === 'all'){
+    for(let y=0;y<4;y++) for(let x=0;x<12;x++) yellow.push([x,y]);
+  } else if(d.shape === 'laser'){
+    LASER_DIRECTIONS.forEach(dir=>{
+      const area = laserArea(actor, dir.dx, dir.dy, d.reach);
+      const hasTarget = laserTargets(actor, d, dir.dx, dir.dy).length > 0;
+      area.forEach(([x,y])=> (hasTarget ? red : yellow).push([x,y]));
+    });
+  } else if(typeof d.shape === 'number' && d.shape > 1){
+    anchorCellCandidates(actor, d).forEach(([x,y])=> yellow.push([x,y]));
+    if(sel.anchor){
+      squareArea(sel.anchor[0], sel.anchor[1], d.shape).forEach(([x,y])=> red.push([x,y]));
+    }
+  } else if(d.shape === 1){
+    anchorCellCandidates(actor, d).forEach(([x,y])=> yellow.push([x,y]));
+  }
+  return { yellow, red };
+}
+
+/* ============================================================
+   【斜紋雙色demo】純展示用，回應「用兩色斜紋取代兩個獨立顏色圖層」這個方案長怎樣。
+   目前沒有任何指令（技能/脫逃/道具/移動...）實際套用這個效果，只是提供函式讓你自己測試預覽。
+   用法（瀏覽器console或之後接到UI都可以）：
+     applyStripePreviewDemo(document.querySelector('.cell'), '#5ec8d8', '#9b6bd1');
+     // 例如脫逃如果之後真的要做「射程=水藍／範圍=紫」的雙色警示，可以這樣測試效果
+   想拿掉整套demo：刪掉這兩個function，跟CSS裡的 .cell.stripe-preview 規則。
+============================================================ */
+function stripeCellBackground(colorA, colorB, stripeWidthPx = 8){
+  return `repeating-linear-gradient(45deg, ${colorA} 0 ${stripeWidthPx}px, ${colorB} ${stripeWidthPx}px ${stripeWidthPx*2}px)`;
+}
+function applyStripePreviewDemo(cellEl, colorA, colorB, stripeWidthPx){
+  if(!cellEl) return;
+  cellEl.classList.add('stripe-preview');
+  cellEl.style.background = stripeCellBackground(colorA, colorB, stripeWidthPx);
+}
+
+function unitAt(x,y){
+  return allUnits().find(u=> u.x===x && u.y===y && u.hp>0 !== false ? (u.x===x&&u.y===y) : false) || allUnits().find(u=>u.x===x&&u.y===y);
+}
+
+/* ============================================================
+   戰場拾取系統
+   【怎麼調整測試用物品】
+   seedFloorItems() 裡的 TEST_LOOT_POOL 是「可能出現的物品清單」，
+   count 是這場戰鬥要灑幾個，改這兩個數字/清單內容就能調整測試量。
+   之後想做「打敗敵人掉落」「戰鬥開始前預先擺放特定寶箱」，
+   都可以直接對 battle.floorItems 這個物件寫入 "x,y":"物品key" 即可。
+============================================================ */
+const TEST_LOOT_POOL = ['potion','bandage','healing_herb','field_ration'];
+
+function seedFloorItems(count){
+  const n = count != null ? count : 4;
+  let placed = 0;
+  let attempts = 0;
+  while(placed < n && attempts < 100){
+    attempts++;
+    const x = Math.floor(Math.random()*12);
+    const y = Math.floor(Math.random()*4);
+    const key = x+','+y;
+    if(unitAt(x,y)) continue; // 站著人的格子不放東西
+    if(battle.floorItems[key]) continue; // 已經有東西了
+    battle.floorItems[key] = TEST_LOOT_POOL[Math.floor(Math.random()*TEST_LOOT_POOL.length)];
+    placed++;
+  }
+}
+
+function attemptLoot(actor, slotIndex){
+  if(actor.interactUsed){ toast('本回合的互動名額已經用掉了'); return; }
+  const key = actor.x+','+actor.y;
+  const itemKey = battle.floorItems[key];
+  if(!itemKey){
+    toast('腳下沒有東西可以撿');
+    return; // 沒有東西時不消耗互動名額，避免玩家無故浪費行動
+  }
+  const p = actor.ref;
+  if(!p){ toast('這個單位無法拾取物品'); return; }
+  // 跟商店共用同一個固定庫存池：從unowned實例裡找一個同key的來拿，不是憑空生成新的一份。
+  // 商店賣光了，戰場也會跟著撿不到；反過來戰場先撿走，商店庫存也會變少。
+  // （已知的小落差：地上視覺上還放著這個道具圖示，但庫存可能早被別處買走／撿光，
+  //   玩家會看到「腳下有東西但拿不到」，之後若要處理可以在戰鬥開始佈置floorItems時
+  //   就先檢查庫存，這次先不動battle floor佈置邏輯）
+  const iidToTake = Object.keys(state.itemInstances).find(iid=> state.itemInstances[iid].key===itemKey && state.itemInstances[iid].status==='unowned');
+  if(!iidToTake){
+    toast('這件道具的庫存已經沒有了');
+    return; // 沒庫存時同樣不消耗互動名額
+  }
+  state.itemInstances[iidToTake].status = 'equipped';
+  p.items[slotIndex] = iidToTake;
+  delete battle.floorItems[key];
+  actor.interactUsed = true;
+  logMsg(`<b>${actor.name}</b> 撿起了「${ITEM_DB[itemKey].name}」。`);
+  renderGrid(); renderLog(false);
+  afterAction(actor); // 拾取成功算用掉互動名額
+}
+
+/* ============================================================
+   陣營／範圍共用判定（見 dev4_design_todo.md 第十二節，reach+shape 改版見 range_sim.html）
+   matchesSide：純粹判斷某單位是否屬於施放者要找的陣營，相對於施放者自身陣營計算，
+   敵方放技能、我方放技能都共用同一套邏輯，不寫死玩家視角。
+
+   chebyshev：切比雪夫距離，reach 判定統一用這個（不是曼哈頓距離，跟移動的曼哈頓判定是兩回事）。
+   squareArea：以錨點(cx,cy)為中心展開N×N範圍，N偶數時往右下多蓋一格，超出棋盤的格子自動濾掉。
+
+   singleTargetCandidates：shape===1（單體技能）用，算出目前可以合法點選的目標「單位」清單，
+   要求該格必須有合法目標（見上次設計討論定案），供 onUnitClick 驗證。
+   anchorCellCandidates：shape>1（AOE技能）用，算出目前可以合法點選的「錨點格子」清單，
+   純粹看reach，允許空放（該格有沒有目標交給執行時的matchesSide判定），供 computeValidCells 高亮與 onCellClick 驗證。
+============================================================ */
+function matchesSide(u, actor, targetSide){
+  if(targetSide === 'enemy') return u.side !== actor.side;
+  if(targetSide === 'ally')  return u.side === actor.side;
+  if(targetSide === 'all')   return true;
+  if(targetSide === 'self')  return u === actor;
+  return false;
+}
+
+function chebyshev(ax, ay, bx, by){
+  return Math.max(Math.abs(ax-bx), Math.abs(ay-by));
+}
+
+/* 【laser機制】8方向定義 + 沿方向直線命中判定，見 dev4_design_todo.md 第十節。
+   dx/dy 用棋盤座標系（x往右、y往下），label 給方向面板UI顯示用。 */
+const LASER_DIRECTIONS = [
+  { key:'n',  label:'↑', dx:0,  dy:-1 },
+  { key:'ne', label:'↗', dx:1,  dy:-1 },
+  { key:'e',  label:'→', dx:1,  dy:0  },
+  { key:'se', label:'↘', dx:1,  dy:1  },
+  { key:'s',  label:'↓', dx:0,  dy:1  },
+  { key:'sw', label:'↙', dx:-1, dy:1  },
+  { key:'w',  label:'←', dx:-1, dy:0  },
+  { key:'nw', label:'↖', dx:-1, dy:-1 },
+];
+
+/* 從施放者所在格為起點（不含自己站的格子），往指定方向延伸最多reach格，超出棋盤邊界就停。 */
+function laserArea(actor, dx, dy, reach){
+  const out = [];
+  let x = actor.x, y = actor.y;
+  for(let i=0;i<reach;i++){
+    x += dx; y += dy;
+    if(x<0 || x>=12 || y<0 || y>=4) break;
+    out.push([x,y]);
+  }
+  return out;
+}
+
+/* 給定方向，算出這條laser線上實際會命中的單位（已套用targetSide判定）。 */
+function laserTargets(actor, d, dx, dy){
+  const area = laserArea(actor, dx, dy, d.reach);
+  return allUnits().filter(u => matchesSide(u, actor, d.targetSide) && area.some(([ax,ay])=>ax===u.x && ay===u.y));
+}
+
+function squareArea(cx, cy, N){
+  const start = -Math.floor((N-1)/2);
+  const end = Math.ceil((N-1)/2);
+  const out = [];
+  for(let dy=start; dy<=end; dy++){
+    for(let dx=start; dx<=end; dx++){
+      const x = cx+dx, y = cy+dy;
+      if(x>=0 && x<12 && y>=0 && y<4) out.push([x,y]);
+    }
+  }
+  return out;
+}
+
+function singleTargetCandidates(actor, d){
+  return allUnits().filter(u => matchesSide(u, actor, d.targetSide) && chebyshev(actor.x, actor.y, u.x, u.y) <= d.reach);
+}
+
+function anchorCellCandidates(actor, d){
+  const out = [];
+  for(let y=0;y<4;y++){
+    for(let x=0;x<12;x++){
+      if(chebyshev(actor.x, actor.y, x, y) <= d.reach) out.push([x,y]);
+    }
+  }
+  return out;
+}
+
+/* 【laser點格子版】給一個座標，找出它屬於哪個方向的射線（8方向彼此不重疊，最多命中一個）。
+   找不到（該格不在任何方向的射程內）回傳null。 */
+function resolveLaserDirection(actor, d, x, y){
+  for(const dir of LASER_DIRECTIONS){
+    const area = laserArea(actor, dir.dx, dir.dy, d.reach);
+    if(area.some(([ax,ay])=> ax===x && ay===y)) return dir;
+  }
+  return null;
+}
+
+function onCellClick(x,y){
+  const actor = currentActor();
+  const sel = battle.selected;
+  if(sel.mode === 'move'){
+    const valid = computeValidCells().some(([vx,vy])=>vx===x&&vy===y);
+    if(!valid) return;
+    const dist = Math.abs(x-actor.x)+Math.abs(y-actor.y);
+    actor.x = x; actor.y = y;
+    actor.movePts = Math.max(0, actor.movePts - dist);
+    logMsg(`<b>${actor.name}</b> 移動了位置。`);
+    afterAction(actor);
+  } else if(sel.mode === 'skill' && sel.skillDef && typeof sel.skillDef.shape === 'number' && sel.skillDef.shape > 1){
+    if(actor.skillUsed){ toast('本回合的技能名額已經用掉了'); return; }
+    const d = sel.skillDef;
+    // 【AOE三點式流程 第三步】已經選過錨點了，這次點擊落在該錨點展開的紅底範圍內 → 直接發動
+    // （範圍內不論有沒有目標都算confirm，空放也允許，見dev4_design_todo.md第十節收尾討論）
+    if(sel.anchor){
+      const area = squareArea(sel.anchor[0], sel.anchor[1], d.shape);
+      if(area.some(([ax,ay])=> ax===x && ay===y)){
+        const targets = allUnits().filter(u=> matchesSide(u, actor, d.targetSide) && area.some(([ax,ay])=>ax===u.x && ay===u.y));
+        showFullscreenFX(d, ()=> executeSkill(actor, sel.skillKey, d, targets));
+        return;
+      }
+    }
+    // 【AOE三點式流程 第二步】選定/改選錨點，只驗證是否在reach內，不要求該格有目標
+    if(chebyshev(actor.x, actor.y, x, y) > d.reach){
+      toast('這格超出技能射程了');
+      return;
+    }
+    battle.selected = { ...sel, anchor:[x,y] };
+    renderSidePanel(); renderGrid();
+  } else if(sel.mode === 'skill' && sel.skillDef && sel.skillDef.shape === 'laser'){
+    // 【laser點格子版】點任一格 → 反推屬於哪個方向 → 直接朝那個方向發動，命中該方向laserTargets算出的全部目標
+    if(actor.skillUsed){ toast('本回合的技能名額已經用掉了'); return; }
+    const d = sel.skillDef;
+    const dir = resolveLaserDirection(actor, d, x, y);
+    if(!dir){
+      toast('這格不在雷射的施放方向上（需在8方向直線上）');
+      return;
+    }
+    const targets = laserTargets(actor, d, dir.dx, dir.dy);
+    showFullscreenFX(d, ()=> executeSkill(actor, sel.skillKey, d, targets));
+  } else if(sel.mode === 'inspect'){
+    if(actor.interactUsed){ toast('本回合的互動名額已經用掉了'); return; }
+    doInspect(actor, x, y);
+  }
+}
+
+function onUnitClick(target){
+  const actor = currentActor();
+  const sel = battle.selected;
+  if(sel.mode === 'skill' && sel.skillDef){
+    if(actor.skillUsed){ toast('本回合的技能名額已經用掉了'); return; }
+    const d = sel.skillDef;
+    // AOE技能：點在有單位的格子上，跟點空格是同一套三點式流程，直接轉給onCellClick用該單位座標處理
+    // （chip.onclick 有 stopPropagation，原本點到單位的格子永遠不會走到onCellClick，這裡補上讓AOE也能點單位所在格）
+    if(typeof d.shape === 'number' && d.shape > 1){
+      onCellClick(target.x, target.y);
+      return;
+    }
+    // laser：點單位跟點該單位所在的格子是同一件事，直接轉給onCellClick統一處理方向反推邏輯
+    if(d.shape === 'laser'){
+      onCellClick(target.x, target.y);
+      return;
+    }
+    if(d.shape === 1){
+      // reach:0 的自身技能（例如recall）本來就會通過singleTargetCandidates（距離自己是0），
+      // 不用另外寫特例，點自己所在格的unit-chip即可，跟其他單體技能走同一套流程
+      if(!singleTargetCandidates(actor, d).includes(target)){
+        toast(d.reach<=1 ? '目標不在技能範圍內(需相鄰)' : '目標超出技能射程或不符合施放對象');
+        return;
+      }
+      showFullscreenFX(d, ()=> executeSkill(actor, sel.skillKey, d, [target]));
+      return;
+    }
+    if(d.shape === 'all'){
+      // 全體技能：點任一個紅底目標都視為確認，效果套用在全部符合targetSide的單位上，不是只對被點到的那個生效
+      if(!matchesSide(target, actor, d.targetSide)){
+        toast('這不是這個技能的施放對象');
+        return;
+      }
+      const targets = allUnits().filter(u=> matchesSide(u, actor, d.targetSide));
+      showFullscreenFX(d, ()=> executeSkill(actor, sel.skillKey, d, targets));
+      return;
+    }
+    return;
+  }
+  // 【脫逃confirm】點自己的unit-chip才真正觸發脫逃，避免手滑誤觸整隊逃跑
+  if(sel.mode === 'flee'){
+    if(target !== actor){
+      toast('請點自己的頭像確認脫逃');
+      return;
+    }
+    battle.selected = {mode:null};
+    doFlee();
+    renderSidePanel(); renderGrid(); renderPortraits();
+    return;
+  }
+  // 【道具目標confirm】點自己或相鄰隊友的unit-chip，把道具用在被點到的那個人身上（不再永遠只能對自己用）
+  if(sel.mode === 'item'){
+    if(actor.interactUsed){ toast('本回合的互動名額已經用掉了'); return; }
+    const candidates = singleTargetCandidates(actor, { targetSide:'ally', reach:1 });
+    if(!candidates.includes(target)){
+      toast('道具只能用在自己或相鄰的隊友身上');
+      return;
+    }
+    const p = actor.ref;
+    const d = sel.itemDef;
+    target.hp = clamp(target.hp + d.heal, 0, target.maxHp);
+    const usedInst = itemInstOf(p.items[sel.itemIndex]);
+    if(usedInst) usedInst.status = 'unowned'; // 用掉＝回到商店庫存（同一個iid），不是永久消失，商店裡可以再買到同一件
+    p.items[sel.itemIndex] = null;
+    actor.interactUsed = true;
+    logMsg(`<b>${actor.name}</b> 對 <b>${target.name}</b> 使用了「${d.name}」，恢復 ${d.heal} 點HP。`);
+    battle.selected = {mode:null};
+    renderGrid(); renderLog(false); renderSidePanel();
+    afterAction(actor);
+    return;
+  }
+}
+
+/* ============================================================
+   全螢幕技能演出（機制骨架，圖片尚未提供時顯示技能名稱佔位）
+   每個技能可在 SKILL_DB 裡選填 fxDuration（毫秒，停留時間）跟
+   fxFade（'fade'=淡出 / 'instant'=瞬間消失），沒填就用下面的預設值。
+   之後想放真的圖片：在 SKILL_DB 該技能加一個 fxImage:'檔名.png' 即可。
+
+   【技能音效】兩個獨立時機，各自選填，沒填就沒聲音、不會報錯：
+   - soundCast：全螢幕演出「開始」時播放（例如揮劍聲、詠唱聲、蓄力音）
+   - soundHit ：效果「結算當下」播放（例如命中聲、爆炸聲、治療光效聲）
+   命名建議：{技能key}_cast.mp3、{技能key}_hit.mp3（例如 heavy_cast.mp3）
+   音效跟背景音樂是疊加播放，不會讓BGM暫停或變小聲。
+============================================================ */
+const FX_DEFAULT_DURATION = 1200;
+const FX_DEFAULT_FADE = 'fade';
+
+function playSound(file, volume){
+  if(!file) return;
+  try{
+    const a = new Audio(file);
+    a.volume = volume != null ? volume : 0.6;
+    a.play().catch(()=>{});
+  }catch(e){ /* 音效檔案讀取失敗時安靜忽略，不影響遊戲進行 */ }
+}
+
+function showFullscreenFX(d, onComplete){
+  const duration = d.fxDuration != null ? d.fxDuration : FX_DEFAULT_DURATION;
+  const fade = d.fxFade || FX_DEFAULT_FADE;
+  playSound(d.soundCast);
+  const overlay = document.createElement('div');
+  overlay.className = 'fullscreen-fx';
+  overlay.innerHTML = d.fxImage
+    ? `<img src="${d.fxImage}">`
+    : `<div class="fx-placeholder">${d.name}<span class="fx-sub">（尚未設定全螢幕圖片・停留${duration}ms・${fade==='fade'?'淡出':'瞬間消失'}）</span></div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(()=> overlay.classList.add('show'));
+  setTimeout(()=>{
+    if(fade === 'fade'){
+      overlay.classList.add('fx-fadeout');
+      setTimeout(()=>{ overlay.remove(); onComplete(); }, 300);
+    } else {
+      overlay.remove();
+      onComplete();
+    }
+  }, duration);
+}
+
+function gainRage(unit, dmgTaken){
+  if(!unit.ref) return;
+  if(unit.resName === '怒氣' && dmgTaken>0){
+    unit.res = clamp(unit.res + dmgTaken, 0, unit.resMax);
+  }
+}
+
+/* ============================================================
+   統一技能執行函式（取代原本並存的 castSingle／castAoe／castAllAllies／doAttack 四段重複邏輯）
+   「普通攻擊」已拿掉，全部輸出手段（含原本的普通攻擊，現在併入各角色的保底基礎技能，
+   例如 slash／chronicle／arcane_bolt／lute_bash）都統一走這裡，見
+   dev4_design_todo.md 第六節。
+
+   targets 由呼叫端先透過 singleTargetCandidates() / anchorCellCandidates() / matchesSide() 依 reach+shape+targetSide 算好，
+   這裡只負責：扣資源檢查 → 演出/音效 → 對每個目標套用效果 → 冷卻/名額 → log/收尾。
+   這樣不管是單體(shape:1)還是範圍(shape:N/'all')，效果套用與傷害公式只有一份，
+   不會有「改了一處公式忘記改另一處」的風險。
+
+   傷害公式：power + 施放者ATK - 目標DEF + 隨機浮動，讓ATK對技能輸出也有意義
+   （見第六節「技能傷害吃ATK：已定案」），公式細節之後可依平衡測試調整。
+   buff類型技能（guard／song_buff）效果尚未實作（見已知bug：_atkBuff是死資料），
+   正式生效要等 STATUS_DB + effectiveStat() 一併處理，此處先保留訊息/音效但不套用數值。
+============================================================ */
+function executeSkill(actor, key, d, targets){
+  const cost = (d.cost && d.cost.res) || 0;
+  if(actor.resName !== '-' && actor.res < cost){ toast(actor.resName+'不足'); return; }
+  if(actor.resName !== '-') actor.res = clamp(actor.res - cost, 0, actor.resMax);
+
+  bubble(actor, d.lines[Math.floor(Math.random()*d.lines.length)]);
+  playSound(d.soundHit);
+
+  if(targets.length === 0){
+    toast('範圍內沒有目標，技能落空');
+  }
+
+  targets.forEach(t=>{
+    if(d.type === 'attack'){
+      const dmg = Math.max(1, d.power + skillLevelBonus(actor,key) + actor.atk - t.def + Math.floor(Math.random()*4));
+      t.hp = clamp(t.hp - dmg, 0, t.maxHp);
+      gainRage(t, dmg);
+      logMsg(`<b>${actor.name}</b> 的「${d.name}」對 <b>${t.name}</b> 造成 ${dmg} 點${d.dmgType}傷害。${t.hp<=0?'<b>'+t.name+'</b> 倒下了。':''}`);
+    } else if(d.type === 'heal'){
+      const heal = d.power + skillLevelBonus(actor,key);
+      t.hp = clamp(t.hp + heal, 0, t.maxHp);
+      logMsg(`<b>${actor.name}</b> 的「${d.name}」為 <b>${t.name}</b> 恢復了 ${heal} 點HP。`);
+    } else {
+      // buff等尚未實作數值效果的技能類型，此處先不對target做任何改動
+    }
+  });
+
+  actor.cooldowns[key] = d.cd;
+  actor.skillUsed = true;
+  renderGrid(); renderLog(false);
+  afterAction(actor);
+}
+
+function bubble(unit, text){
+  unit._bubble = text;
+  setTimeout(()=>{ unit._bubble = null; if(battle) renderGrid(); }, 1800);
+}
+
+/* ============================================================
+   SIDE PANEL (action bar for current actor)
+============================================================ */
+function renderSidePanel(){
+  const panel = document.getElementById('sidePanel');
+  const actor = currentActor();
+  if(!actor){ panel.innerHTML=''; return; }
+
+  if(actor.hp<=0){
+    panel.innerHTML = `<div style="font-size:13px;color:var(--text-dim);">${actor.name} 已倒下，無法行動。</div>
+      <div style="margin-top:8px;"><button class="btn primary" id="btnSkipDown">結束回合</button></div>`;
+    document.getElementById('btnSkipDown').onclick = endActorTurn;
+    return;
+  }
+
+  if(actor.side === 'enemy'){
+    panel.innerHTML = `<div style="font-size:13px;color:var(--text-dim);">敵方行動中...</div>`;
+    return;
+  }
+
+  const p = actor.ref;
+  const movePts = actor.movePts != null ? actor.movePts : TURN_MOVE_POOL;
+  panel.innerHTML = `
+    <div class="actor-info">
+      <div class="name">${actor.name}</div>
+      <div class="hp">HP ${actor.hp}/${actor.maxHp}${actor.resName!=='-'?` · ${actor.resName} ${actor.res}/${actor.resMax}`:''}</div>
+    </div>
+    <div style="font-size:11px;color:var(--gold-bright);margin:4px 0 8px;">移動 ${movePts}/${TURN_MOVE_POOL} · 技能 ${actor.skillUsed?0:1}/1 · 互動 ${actor.interactUsed?0:1}/1</div>
+    <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:6px;">行動</div>
+    <div class="skillgrid" id="skillGrid"></div>
+    <div id="itemArea"></div>
+    <div style="margin-top:10px;"><button class="btn" id="btnEndTurn" style="width:100%;">結束回合</button></div>
+  `;
+
+  const skillGrid = document.getElementById('skillGrid');
+
+  // 固定前3格：移動 / 檢查 / 脫逃
+  // 普通攻擊已拿掉，攻擊功能併入下方技能清單裡的保底基礎技能（點技能即可，一樣佔技能名額）；檢查佔用互動名額，脫逃不佔任何名額
+  // 脫逃改成需要confirm：點下去只是「選取」（進入flee模式，棋盤上會把自己標紅），
+  // 要再點自己的unit-chip才會真正觸發doFlee()，避免手滑誤觸整隊逃跑（見onUnitClick的flee分支）
+  const fixedSlots = [
+    { key:'__move',    label:'移動', disabled: movePts<=0, onClick: ()=>{ battle.selected = {mode:'move'}; renderSidePanel(); renderGrid(); renderPortraits(); } },
+    { key:'__inspect', label:'檢查', disabled: actor.interactUsed, onClick: ()=>{ battle.selected = {mode:'inspect'}; renderSidePanel(); renderGrid(); renderPortraits(); } },
+    { key:'__flee',    label:'脫逃', disabled:false, onClick: ()=>{ battle.selected = {mode:'flee'}; renderSidePanel(); renderGrid(); renderPortraits(); } },
+  ];
+  fixedSlots.forEach(slot=>{
+    const btn = document.createElement('button');
+    btn.textContent = slot.label;
+    const isSelected = battle.selected.mode === slot.key.replace('__','');
+    // 【選取提示修正】原本只在選取時設 className='primary'，未選取時完全沒有class（等於用瀏覽器預設白底按鈕樣式，
+    // 而且.primary缺少基礎.btn class，CSS的.btn.primary規則其實從未真正生效過）。
+    // 改成固定套用 'btn small' 當底色，選取時額外疊加 'primary'（金黃底），未選取維持面板深色底（不是白底）。
+    btn.className = 'btn small' + (isSelected ? ' primary' : '');
+    if(slot.disabled){ btn.disabled = true; } else { btn.onclick = slot.onClick; }
+    skillGrid.appendChild(btn);
+  });
+
+  for(let i=0;i<8;i++){
+    const key = actor.skills[i];
+    const btn = document.createElement('button');
+    if(!key){
+      btn.textContent = '未學習';
+      btn.className = 'btn small locked';
+      btn.disabled = true;
+    } else {
+      const d = SKILL_DB[key];
+      const cdLeft = actor.cooldowns[key] || 0;
+      const isSelected = battle.selected.mode === 'skill' && battle.selected.skillKey === key;
+      btn.textContent = d.name + (cdLeft>0 ? ` (冷卻${cdLeft})` : '');
+      btn.className = 'btn small' + (isSelected ? ' primary' : '');
+      if(cdLeft>0 || actor.skillUsed) btn.disabled = true;
+      // 【施放預覽流程統一入口】不論shape是什麼，點技能一律只做「選取」，
+      // 不在這裡直接發動——self（reach:0）跟all已經拿掉自動觸發特例，
+      // 改成跟其他技能一樣走renderGrid()的紅底/黃底高亮，由玩家點目標/格子/方向confirm才真正執行
+      btn.onclick = ()=>{
+        if(actor.skillUsed){ toast('本回合的技能名額已經用掉了'); return; }
+        battle.selected = { mode:'skill', skillKey:key, skillDef:d };
+        renderPortraits();
+        renderSidePanel(); renderGrid();
+      };
+    }
+    skillGrid.appendChild(btn);
+  }
+
+  const itemToggleWrap = document.createElement('div');
+  itemToggleWrap.style.marginTop = '8px';
+  const itemBtn = document.createElement('button');
+  itemBtn.className = 'btn small';
+  itemBtn.textContent = '開啟道具欄';
+  itemBtn.onclick = ()=> renderItemArea(actor);
+  itemToggleWrap.appendChild(itemBtn);
+  panel.querySelector('#itemArea').before(itemToggleWrap);
+  document.getElementById('btnEndTurn').onclick = endActorTurn;
+  // 道具目標選取中（sel.mode==='item'）時，itemArea 預設是空的（要手動點「開啟道具欄」才會渲染），
+  // 這裡自動補渲染一次，避免選了道具後整份側邊欄重繪、道具清單瞬間消失、選取狀態看起來像丟失了
+  if(battle.selected.mode === 'item'){
+    renderItemArea(actor);
+  }
+}
+
+function renderItemArea(actor){
+  const area = document.getElementById('itemArea');
+  const p = actor.ref;
+  if(!p){ area.innerHTML=''; return; }
+  area.innerHTML = `<div style="font-size:11.5px;color:var(--text-dim);margin:8px 0 6px;">選擇要使用的道具（可對自己或相鄰隊友使用），或點空格拾取腳下的物品</div>
+    <div class="skillgrid" id="itemGrid"></div>`;
+  const grid = document.getElementById('itemGrid');
+  p.items.forEach((it,i)=>{
+    const btn = document.createElement('button');
+    if(!it){
+      // 拾取沒有「對象」的歧義（只能撿自己腳下的東西），維持原本點一下立即執行，不用另外走confirm流程
+      btn.textContent = '空（點擊拾取）';
+      btn.className = 'btn small';
+      if(actor.interactUsed) btn.disabled = true;
+      btn.onclick = ()=> attemptLoot(actor, i);
+    }
+    else {
+      const d = itemDefOf(it);
+      const isSelected = battle.selected.mode === 'item' && battle.selected.itemIndex === i;
+      btn.textContent = d.name;
+      btn.className = 'btn small' + (isSelected ? ' primary' : '');
+      if(actor.interactUsed) btn.disabled = true;
+      // 【道具需要指定目標】點道具只做「選取」，改成跟單體技能一樣的兩點式流程：
+      // 選取後棋盤上自己＋相鄰隊友的unit-chip會標紅，玩家點紅底目標才真正使用（見onUnitClick的item分支）。
+      // 再點一次同一顆道具鈕＝取消選取（跟脫逃同樣的toggle邏輯）。
+      btn.onclick = ()=>{
+        if(actor.interactUsed){ toast('本回合的互動名額已經用掉了'); return; }
+        if(isSelected){
+          battle.selected = {mode:null};
+        } else {
+          battle.selected = { mode:'item', itemIndex:i, itemDef:d };
+        }
+        renderPortraits(); renderSidePanel(); renderGrid();
+      };
+    }
+    grid.appendChild(btn);
+  });
+}
+
+/* ============================================================
+   TURN FLOW（三旗標回合結構）
+   每個單位每輪有三種獨立名額：
+   - movePts：移動池，預設3步，每次移動依實際格數扣點，可分次移動
+   - skillUsed：技能名額，1次，攻擊併入技能名額（攻擊也算用掉這1次）
+   - interactUsed：互動名額，1次，檢查/拾取/使用道具都算這裡
+   三個名額全部用完才會自動結束回合；名額沒用完也可以按「結束回合」提前放棄剩餘名額。
+   TURN_MOVE_POOL 是移動池步數，想調整的話改這個數字就好。
+============================================================ */
+const TURN_MOVE_POOL = 3;
+
+function startActorTurn(actor){
+  if(!actor) return;
+  actor.movePts = TURN_MOVE_POOL;
+  actor.skillUsed = false;
+  actor.interactUsed = false;
+}
+
+/* 玩家做完一個動作後呼叫：三個名額都耗盡才真正結束回合，
+   沒耗盡的話就留在原地讓玩家繼續選下一個動作 */
+function afterAction(actor){
+  battle.selected = { mode:null };
+  saveGame();
+  if(checkBattleEnd()) return;
+  if(actor.movePts<=0 && actor.skillUsed && actor.interactUsed){
+    endActorTurn();
+  } else {
+    renderOrderRow(); renderGrid(); renderSidePanel(); renderPortraits(); renderLog(false);
+  }
+}
+
+function endActorTurn(){
+  battle.selected = { mode:null };
+  battle.orderIdx += 1;
+  if(battle.orderIdx >= battle.order.length){
+    // tick cooldowns for all units at end of round
+    allUnits().forEach(u=>{
+      if(u.cooldowns) Object.keys(u.cooldowns).forEach(k=>{ if(u.cooldowns[k]>0) u.cooldowns[k]-=1; });
+      if(u.resName !== '-' && u.resName !== '怒氣') u.res = clamp(u.res+1, 0, u.resMax);
+    });
+    battle.round += 1;
+    if(REROLL_ORDER_EACH_ROUND){
+      rollOrder(); // 重新擲速度排序
+    } else {
+      battle.orderIdx = 0; // 沿用第1回合的順序，只把指標歸零重新跑一輪
+    }
+  }
+  saveGame();
+  if(checkBattleEnd()) return;
+  startActorTurn(currentActor()); // 換人了，重置三旗標名額
+  renderOrderRow(); renderGrid(); renderSidePanel(); renderPortraits(); renderLog(false);
+  maybeRunEnemyTurn();
+}
+
+function maybeRunEnemyTurn(){
+  const actor = currentActor();
+  if(!actor || battle.finished) return;
+  if(actor.hp<=0){ setTimeout(endActorTurn, 400); return; }
+  if(actor.side !== 'enemy') return;
+  setTimeout(()=> runEnemyAI(actor), 700);
+}
+
+/* ============================================================
+   敵人AI：分級參數表（見 dev4_design_todo.md 第十一節「AI分級系統」）
+
+   同一套評分骨架（scoreTarget，見下方），不同敵人套用不同參數即可呈現
+   「笨AI／普通AI／精英AI」，不用為每種聰明程度另寫一套判斷邏輯。
+
+   四個參數的意義：
+   - wHp   ：目標傷勢比例的加權（傷越重分數越高，越容易被優先鎖定/補刀）
+   - wDef  ：目標防禦力低於3時的加分（脆皮角色更容易被鎖定）
+   - wKill ：這次攻擊估算打得死目標時的加分（大幅提升，優先斬殺）
+   - pTop  ：算完分數後，真正選到「最高分目標」的機率（%），
+             剩下 (100-pTop)% 的機率會從其餘候選目標中隨機挑一個，
+             這是刻意保留的不可預測性，避免玩家靠「墊高血量」等手法完全操控AI鎖定對象
+
+   ▶ 這次三個等級的數值先設成完全一樣（等同 normal），只接架構、不分級。
+     之後想讓某些敵人變笨或變精英，只需要「調整下面這三組數字」，
+     不用改 scoreTarget() 或 decideEnemyAction() 裡的任何程式碼。
+
+   ▶ 怎麼幫特定敵人指定等級：
+     去 ENEMY_TEMPLATES 裡該敵人的物件，加一個 aiProfile 欄位，值填
+     'dumb' / 'normal' / 'elite' 其中一個字串，例如：
+       goblin: ()=> ({ ..., aiProfile:'dumb', ... })
+     不填這個欄位的敵人，會自動 fallback 用 normal（見 getAiProfile()），
+     所以現有的 goblin/goblinShaman 不用馬上補這個欄位也不會出錯。
+
+   ▶ 之後想再加一個新等級（例如比elite更狠的 'boss'），
+     只需要在下面這個物件裡多加一組 key，不用動其他程式碼。
+============================================================ */
+const AI_PROFILES = {
+  dumb:   { wHp:50, wDef:20, wKill:100, pTop:80 }, // 目前與normal相同，僅接架構，之後調這幾個數字即可分級
+  normal: { wHp:50, wDef:20, wKill:100, pTop:80 },
+  elite:  { wHp:50, wDef:20, wKill:100, pTop:80 },
+};
+
+function getAiProfile(actor){
+  return AI_PROFILES[actor.aiProfile] || AI_PROFILES.normal; // 查無此key（如打錯字）時安全fallback，不會讓遊戲崩潰
+}
+
+/* 傷勢比例超過此門檻（HP比例 <= 門檻）才「考慮」治療；門檻式設計見上次討論定案，
+   跨過門檻後仍用機率決定要不要真的觸發，保留一點不可預測性，不是100%必治。
+   想調整觸發時機：改 HEAL_HP_RATIO_THRESHOLD（門檻）；
+   想調整觸發積極度：改 HEAL_TRIGGER_CHANCE（機率）。這兩個各自獨立，互不影響。 */
+const HEAL_HP_RATIO_THRESHOLD = 0.5;
+const HEAL_TRIGGER_CHANCE = 0.4;
+
+/* 評分越高代表AI越想打這個目標，公式細節見第十一節，數值仍為暫定，之後依實戰調整。
+   estDmg 用來估算「這次攻擊打不打得死」，不含隨機浮動，只取期望值方便判斷。 */
+function scoreTarget(target, actor, d, profile){
+  const estDmg = Math.max(1, d.power + actor.atk - target.def);
+  const missingRatio = (target.maxHp - target.hp) / target.maxHp;
+  let score = profile.wHp * missingRatio;
+  if(target.def < 3) score += profile.wDef;
+  if(estDmg >= target.hp) score += profile.wKill;
+  return score;
+}
+
+/* 從候選目標裡挑一個：pTop%機率選分數最高者，剩下機率從其餘目標中隨機挑一個。
+   只有1個候選時不用評分，直接回傳，省得白算。 */
+function pickWeightedTarget(candidates, actor, d, profile){
+  if(candidates.length === 0) return null;
+  if(candidates.length === 1) return candidates[0];
+  const scored = candidates.map(t=> ({ t, s: scoreTarget(t, actor, d, profile) }));
+  scored.sort((a,b)=> b.s - a.s);
+  if(Math.random()*100 < profile.pTop) return scored[0].t;
+  const rest = scored.slice(1);
+  return rest[Math.floor(Math.random()*rest.length)].t;
+}
+
+/* 技能是否「這回合可用」：冷卻是否已轉好、資源是否夠付，兩者皆過才算可用。
+   跟 executeSkill() 內的資源檢查是分開的兩層防呆——這裡先篩掉不可用的技能，
+   避免AI選了一個付不出資源的技能導致 executeSkill() 中途toast返回、卡住整個回合。 */
+function canAffordSkill(actor, key, d){
+  const cdLeft = (actor.cooldowns && actor.cooldowns[key]) || 0;
+  if(cdLeft > 0) return false;
+  const cost = (d.cost && d.cost.res) || 0;
+  if(actor.resName !== '-' && actor.res < cost) return false;
+  return true;
+}
+
+/* ============================================================
+   敵人AI決策層（取代原本寫死 goblin_hit 的版本，見第十一節）
+
+   核心改動：
+   - 技能改讀 actor.skills 陣列動態查 SKILL_DB，不再寫死 goblin_hit
+   - 目標範圍判定直接沿用 singleTargetCandidates()（跟玩家點技能時同一套函式），
+     shape/targetSide/reach 三者共用同一份邏輯，敵人放「治療友軍」「自療」都不用另外寫特例
+   - 治療觸發改成「門檻+機率」，不再是不看傷勢的固定 Math.random()<0.4
+   - 攻擊目標改用 scoreTarget() 加權評分挑選，不再是相鄰敵人裡隨機挑一個
+     （舊版 adjacentEnemies() 函式已一併移除，現在改用下方共用的 singleTargetCandidates()）
+
+   本輪刻意不處理（避免範圍蔓延，見設計文件第十一節「這次刻意不做」）：
+   - AOE技能（shape>1）AI施放邏輯：下方 usableSkills 篩選時直接排除，之後AOE系統穩定再補
+   - 真正路徑搜尋：移動邏輯沿用舊版單軸試探，卡住就放棄本回合剩餘移動
+   - 攻擊後再移動（重新站位）：本輪只支援「移動→攻擊」，不支援「攻擊→移動」，簡化收尾判斷
+============================================================ */
+function decideEnemyAction(actor){
+  const profile = getAiProfile(actor);
+
+  // 只挑「這回合可用」且「shape===1（單體）」的技能，AOE本輪不處理
+  const usableSkills = (actor.skills || [])
+    .map(key => ({ key, d: SKILL_DB[key] }))
+    .filter(s => s.d && s.d.shape === 1 && canAffordSkill(actor, s.key, s.d));
+
+  // 1. 治療判斷：門檻式——傷勢比例跨過門檻才考慮，考慮到了還要過一次機率才真的觸發
+  const healSkills = usableSkills.filter(s => s.d.type === 'heal');
+  let bestHeal = null; // 挑「最需要治療（HP比例最低）」的那個組合
+  healSkills.forEach(s => {
+    const wounded = singleTargetCandidates(actor, s.d).filter(u => u.hp > 0 && u.hp < u.maxHp);
+    wounded.forEach(t => {
+      const hpRatio = t.hp / t.maxHp;
+      if(hpRatio <= HEAL_HP_RATIO_THRESHOLD && (!bestHeal || hpRatio < bestHeal.hpRatio)){
+        bestHeal = { skill: s, target: t, hpRatio };
+      }
+    });
+  });
+  if(bestHeal && Math.random() < HEAL_TRIGGER_CHANCE){
+    return { type:'skill', key: bestHeal.skill.key, d: bestHeal.skill.d, targets: [bestHeal.target] };
+  }
+
+  // 2. 攻擊判斷：多個可用攻擊技能時，先選第一個「射程內有目標」的技能（本輪敵人多半只有1個攻擊技能，
+  //    之後技能變多時可以在這裡加「依威力/特效挑技能」的邏輯，這次不擴大範圍）
+  const atkSkills = usableSkills.filter(s => s.d.type === 'attack');
+  for(const s of atkSkills){
+    const candidates = singleTargetCandidates(actor, s.d).filter(u => u.hp > 0);
+    if(candidates.length > 0){
+      const target = pickWeightedTarget(candidates, actor, s.d, profile);
+      return { type:'skill', key: s.key, d: s.d, targets: [target] };
+    }
+  }
+
+  // 3. 沒有技能可用/沒有目標在射程內 → 朝最近的敵對單位移動一步（沿用舊版單軸試探，無路徑搜尋）
+  if(actor.movePts > 0){
+    const opposing = allUnits().filter(u => matchesSide(u, actor, 'enemy') && u.hp > 0);
+    if(opposing.length > 0){
+      const nearest = opposing.slice().sort((a,b)=>
+        (Math.abs(a.x-actor.x)+Math.abs(a.y-actor.y)) - (Math.abs(b.x-actor.x)+Math.abs(b.y-actor.y))
+      )[0];
+      return { type:'move', target: nearest };
+    }
+  }
+
+  return { type:'pass' };
+}
+
+function runEnemyAI(actor){
+  if(!battle || battle.finished) return;
+
+  const decision = decideEnemyAction(actor);
+
+  if(decision.type === 'skill'){
+    executeSkill(actor, decision.key, decision.d, decision.targets); // 沿用玩家同一套執行層，log/音效/冷卻/資源全部自動處理
+    if(battle.finished) return;
+    endActorTurn(); // 本輪不支援「攻擊後再移動」，用完技能直接收尾（見上方說明）
+    return;
+  }
+
+  if(decision.type === 'move'){
+    const nearest = decision.target;
+    const dx = nearest.x - actor.x, dy = nearest.y - actor.y;
+    let nx = actor.x + Math.sign(dx), ny = actor.y;
+    if(unitAt(nx,ny)) { nx = actor.x; ny = actor.y + Math.sign(dy); }
+    if(!unitAt(nx,ny) && nx>=0 && nx<12 && ny>=0 && ny<4){
+      actor.x = nx; actor.y = ny;
+      actor.movePts = Math.max(0, actor.movePts - 1);
+      logMsg(`<b>${actor.name}</b> 向前逼近。`);
+      renderGrid();
+      setTimeout(()=> runEnemyAI(actor), 500); // 移動後再決策一次，讓「移動到相鄰後接著攻擊」可以在同一回合內發生
+    } else {
+      // 卡住走不過去（無路徑搜尋，見第十一節技術債待辦），本回合放棄剩餘移動
+      logMsg(`<b>${actor.name}</b> 被擋住了，暫時無法前進。`);
+      renderGrid();
+      endActorTurn();
+    }
+    return;
+  }
+
+  endActorTurn(); // type==='pass'：沒有目標、沒有技能可用、也無法移動
+}
+
+/* ============================================================
+   FLEE / END
+============================================================ */
+function doInspect(actor, x, y){
+  logMsg(`<b>${actor.name}</b> 檢查了那個位置，似乎沒有什麼異常。`);
+  actor.interactUsed = true; // 檢查併入互動名額，跟拾取共用同一個名額
+  renderLog(false);
+  afterAction(actor);
+}
+
+function doFlee(){
+  const stopChance = battle.def.fleeBlockChance || 0;
+  if(Math.random() < stopChance){
+    logMsg('逃脫失敗!敵人擋住了去路。');
+    renderLog(false);
+    return;
+  }
+  logMsg('全隊成功脫離了戰鬥。');
+  battle.finished = true;
+  saveGame();
+  endBattleReturnToPrep('你們暫時撤退了。');
+}
+
+function checkBattleEnd(){
+  if(!battle || battle.finished) return false;
+  const alliesAlive = battle.allies.some(u=>u.hp>0);
+  const enemiesAlive = battle.enemies.some(u=>u.hp>0);
+  if(!enemiesAlive){
+    battle.finished = true;
+    const goldGain = 20 + Math.floor(Math.random()*15);
+    state.gold += goldGain;
+    battle.allies.forEach(u=>{ if(u.ref) u.ref.hp = u.hp; });
+    if(battle.def.unlockFlag) setFlag(battle.def.unlockFlag);
+    if(battle.chapterId != null){
+      state.maxChapterReached = Math.max(state.maxChapterReached||0, battle.chapterId);
+    }
+    saveGame();
+    endBattleReturnToPrep(`戰鬥勝利！獲得 ${goldGain} 金幣。`);
+    return true;
+  }
+  if(!alliesAlive){
+    battle.finished = true;
+    battle.allies.forEach(u=>{ if(u.ref) u.ref.hp = Math.ceil(u.ref.maxHp*0.3); });
+    saveGame();
+    endBattleReturnToPrep('全隊倒下……幸好只是暫時的，隊伍已撤回休整。');
+    return true;
+  }
+  return false;
+}
+
+function endBattleReturnToPrep(msg){
+  setNavLocked(false);
+  const bgm = document.getElementById('bgm');
+  bgm.pause();
+  const el = document.getElementById('viewBattle');
+  // 不再清空整個戰場畫面（原本會把grid/立繪等全部替換掉），
+  // 改成疊加一條浮動結算列在畫面下方，讓玩家先看清楚戰場最終狀態，自己決定何時按返回
+  const overlay = document.createElement('div');
+  overlay.className = 'battle-result-overlay';
+  overlay.innerHTML = `<div class="result-banner">${msg}</div>
+    <button class="btn primary" id="btnBackPrep">返回準備畫面</button>`;
+  el.appendChild(overlay);
+  document.getElementById('btnBackPrep').onclick = ()=> switchView('prep');
+}
+
+function toggleLog(){
+  const full = document.getElementById('msglog').classList.toggle('expanded');
+  renderLog(full);
+  document.getElementById('btnLogToggle').textContent = full ? '收回紀錄' : '展開紀錄';
+}
+function renderLog(expanded){
+  const box = document.getElementById('msglog');
+  const list = expanded ? battle.log : battle.log.slice(-6);
+  box.style.maxHeight = expanded ? '360px' : '150px';
+  box.innerHTML = list.map(m=>`<div class="row">${m}</div>`).join('');
+  box.scrollTop = box.scrollHeight;
+  document.getElementById('logCount').textContent = `紀錄 ${battle.log.length}/100`;
+}
+
+/* ============================================================
+   INIT
+============================================================ */
+async function init(){
+  const loaded = await loadGame();
+  if(!loaded){ state = freshState(); saveGame(); }
+  // 個體實例模型（iid+status）上線：舊存檔的 equipment/skills/items 存的是key字串，
+  // 跟新格式不相容，且專案已定案不寫遷移腳本（見設計文件），偵測到舊格式就直接重開新局
+  if(!state.equipInstances || !state.skillInstances || !state.itemInstances){
+    toast('資料格式已更新，重新開始新的存檔');
+    state = freshState(); saveGame();
+  }
+  // 相容舊存檔：補上這批更新新增的欄位，避免舊存檔缺欄位而報錯
+  if(!state.flags) state.flags = {};
+  if(state.maxChapterReached == null) state.maxChapterReached = 0;
+  if(state.crystal == null) state.crystal = 3200; // 相容舊存檔：技能水晶貨幣，補上初始值
+  if(state.sphere == null) state.sphere = 5000;
+  if(state.expPool == null) state.expPool = 5000;
+  const freshRef = freshParty(); // 拿新角色的預設unlockChapter/active，補進舊存檔的角色資料
+  state.party.forEach(p=>{
+    const ref = freshRef.find(f=>f.id===p.id);
+    if(p.unlockChapter == null) p.unlockChapter = ref ? ref.unlockChapter : 0;
+    if(p.active == null) p.active = ref ? ref.active : true;
+    if(p.level == null) p.level = 1;
+    if(!p.training) p.training = { hp:0, sp:0, atk:0, def:0 };
+  });
+  renderNav();
+  switchView('chapters');
+  initChangelogModal();
+}
+init();
+
+/* ============================================================
+   版本紀錄彈窗（隱藏版本號觸發）
+============================================================ */
+function initChangelogModal(){
+  const latest = CHANGELOG[0];
+  document.getElementById('versionTag').textContent = latest ? latest.version : '';
+  const modal = document.getElementById('changelogModal');
+  const body = document.getElementById('changelogModalBody');
+  body.innerHTML = '';
+  CHANGELOG.forEach(entry=>{
+    const block = document.createElement('div');
+    block.style.marginBottom = '14px';
+    block.innerHTML = `<div style="font-size:12.5px;color:var(--gold-bright);font-weight:600;margin-bottom:4px;">${entry.version} <span style="color:var(--text-dim);font-weight:400;">· ${entry.date}</span></div>
+      <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-dim);line-height:1.8;">
+        ${entry.notes.map(n=>`<li>${n}</li>`).join('')}
+      </ul>`;
+    body.appendChild(block);
+  });
+  const openModal = ()=> modal.classList.add('show');
+  const closeModal = ()=> modal.classList.remove('show');
+  document.getElementById('versionTag').onclick = openModal;
+  document.getElementById('changelogModalClose').onclick = closeModal;
+  modal.onclick = (e)=>{ if(e.target === modal) closeModal(); };
+}
+
+})();
+</script>
+</body>
+</html>
