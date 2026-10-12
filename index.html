@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<title>0.48DW(戰棋版・第一階段)</title>
+<title>0.50標記DW(戰棋版・第一階段)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -280,6 +279,12 @@ footer.foot{text-align:center;margin-top:20px;font-size:11px;color:var(--text-di
    優先度(z-index:150)高於網格，不用另外做一套疊層樣式 */
 .battle-icon{position:absolute;z-index:30;width:38px;height:38px;border-radius:50%;background:rgba(15,17,21,.85);border:1px solid var(--gold);color:var(--gold-bright);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.4);}
 .battle-icon:active{transform:scale(.92);}
+/* v0.50-b4：探索畫面角落的小按鈕（整備／回顧），點開後把原本的畫面疊在探索上面，關掉就回到原處 */
+.icon-prep{right:58px;bottom:10px;}
+.icon-codex{right:10px;bottom:10px;}
+.view-overlay{position:fixed;inset:0;z-index:300;background:rgba(10,12,16,.96);overflow:auto;padding:56px 16px 16px;display:block;}
+.view-overlay > *{max-width:1100px;margin-left:auto;margin-right:auto;}
+.overlay-close{position:fixed;right:16px;top:12px;z-index:310;}
 .icon-action{left:10px;bottom:10px;}
 .icon-log{right:10px;bottom:10px;}
 .icon-status{right:10px;top:10px;}
@@ -310,7 +315,7 @@ footer.foot{text-align:center;margin-top:20px;font-size:11px;color:var(--text-di
 /* ---- 開場序列 ---- */
 .battle-intro{position:fixed;inset:0;z-index:420;pointer-events:auto;}
 .battle-intro .intro-curtain{position:absolute;inset:0;background:#000;opacity:0;transition:opacity .6s ease;}
-.battle-intro .intro-curtain.show{opacity:1;}
+.battle-intro .intro-curtain.show{opacity:var(--curtain-a,1);}
 .battle-intro .intro-title{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%) scale(.96);text-align:center;opacity:0;transition:opacity .7s ease,transform .7s ease;pointer-events:none;padding:0 16px;}
 .battle-intro .intro-title.show{opacity:1;transform:translateY(-50%) scale(1);}
 .battle-intro .it-en{font-family:'Spectral',Georgia,serif;font-size:clamp(28px,6.5vw,58px);font-weight:700;letter-spacing:.12em;color:var(--gold-bright);text-transform:uppercase;text-shadow:0 0 24px rgba(201,162,39,.45);}
@@ -380,13 +385,30 @@ footer.foot{text-align:center;margin-top:20px;font-size:11px;color:var(--text-di
 .battle-intro .shard .orn-fill{animation:none !important;opacity:1 !important;}
 .battle-intro .intro-flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 48%,rgba(255,231,150,.6),rgba(0,0,0,0) 58%);opacity:0;pointer-events:none;}
 /* ---- v0.48：3D戰場（取代舊的.grid/.cell/.unit-chip DOM格子） ---- */
-.stage3d{position:relative;width:100%;aspect-ratio:1/1;max-height:78vh;border-radius:10px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;}
+.stage3d{position:relative;width:100%;aspect-ratio:16/10;max-height:80vh;   /* v0.50-b6a：探索與戰鬥共用同一個畫面大小（想改比例／高度上限就改這一行） */
+  border-radius:10px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;}
 .stage3d-cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
 .stage3d-ov{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
 .stage3d-ctl{position:absolute;left:8px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;z-index:5;}
 .stage3d-ctl button{width:34px;height:34px;border-radius:8px;border:1px solid var(--gold);background:rgba(15,17,21,.78);color:var(--gold-bright);font-size:16px;line-height:1;cursor:pointer;padding:0;}
 .stage3d-ctl button:active{transform:scale(.92);}
 .stage3d-nogl{position:absolute;inset:0;padding:30px;color:var(--text);z-index:6;}
+/* v0.50-a：探索畫面 */
+.explore-wrap{position:relative;}
+.explore-host .stage3d, .grid-wrap .stage3d{background:radial-gradient(ellipse at 50% 40%,#22302b 0%,#141a1a 70%,#0d1012 100%);border:1px solid var(--border);}
+/* v0.50-b6a：戰鬥畫面的行動順序列改成疊在畫面左上角（跟探索的HUD同位置），不再佔一列高度，畫面大小才會跟探索一樣 */
+.battle-wrap{border:0;border-radius:0;margin-bottom:0;}
+.battle-top{position:absolute;left:0;right:0;top:0;z-index:6;pointer-events:none;}
+.battle-top > *{pointer-events:auto;}
+.grid-wrap{padding:0;}
+.explore-hud{position:absolute;left:12px;top:10px;z-index:6;pointer-events:none;font-size:12px;line-height:1.55;color:var(--text);background:rgba(15,17,21,.62);border:1px solid rgba(201,162,39,.35);border-radius:8px;padding:6px 10px;}
+.explore-zone{position:absolute;right:12px;top:10px;z-index:7;background:rgba(15,17,21,.78);color:var(--text);border:1px solid rgba(201,162,39,.45);border-radius:8px;padding:5px 8px;font-size:12px;}
+.explore-alert{position:absolute;left:50%;top:26%;transform:translate(-50%,0);z-index:8;pointer-events:none;font-size:64px;font-weight:900;color:#ffd84a;text-shadow:0 0 6px #000,0 3px 0 #a33,0 0 18px rgba(255,80,60,.8);opacity:0;}
+.explore-alert.show{opacity:1;animation:exAlertPop .28s ease-out;}
+@keyframes exAlertPop{0%{transform:translate(-50%,14px) scale(.4);}60%{transform:translate(-50%,-6px) scale(1.25);}100%{transform:translate(-50%,0) scale(1);}}
+.explore-hud b{color:var(--gold-bright);font-size:13px;}
+.explore-hud span{color:var(--text-dim);}
+.explore-hud .dim{font-size:11px;opacity:.85;}
 /* 單位頭上的DOM標籤：.utag定位在腳下，由B3D每幀投影更新transform與--h(單位像素高)/--w(一格像素寬) */
 .utag{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:3;will-change:transform;}
 .utag .head{position:absolute;left:0;bottom:var(--h,40px);width:0;height:0;}
@@ -402,6 +424,7 @@ footer.foot{text-align:center;margin-top:20px;font-size:11px;color:var(--text-di
   <div id="viewChapters"></div>
   <div id="viewPrep" style="display:none;"></div>
   <div id="viewCodex" style="display:none;"></div>
+  <div id="viewExplore" style="display:none;"></div>
   <div id="viewBattle" style="display:none;"></div>
 
   <footer class="foot">第一階段核心版本 · 進度自動存於此瀏覽器。行動順序=速度10+隨機1~20；戰場為3D地形格位系統（每場戰鬥自訂大小）。 <span class="version-tag" id="versionTag"></span></footer>
@@ -462,7 +485,7 @@ for(let i=8;i<=20;i++) CHAPTERS.push({id:i, arcId:'arc2', name:'第'+i+'章', de
    遊戲內只顯示版本號；更新紀錄(changelog)改存在獨立的 changelog.md，不再放進遊戲檔案（避免檔案臃腫）。
    每次升版三處要一起改：這一行 GAME_VERSION、changelog.md 最上方新增一段、檔名後兩碼（例如 game_dev5047.html）。
 ============================================================ */
-const GAME_VERSION = 'v0.48';
+const GAME_VERSION = 'v0.50-b8';
 
 /* ============================================================
    回顧（Codex）圖鑑資料
@@ -543,6 +566,8 @@ function skillSummaryText(d){
     }
   } else if(d.type === 'utility' && d.effect === 'resetCooldowns'){
     parts.push('重置自身所有技能冷卻');
+  } else if(d.type === 'utility' && d.effect === 'teleport'){
+    parts.push(`瞬間移動至 ${d.reach} 格內的空格`);
   } else {
     parts.push('功能性技能');
   }
@@ -858,6 +883,8 @@ const SKILL_DB = {
 
   lute_bash:  { name:'魯特琴敲擊', type:'attack', dmgType:1, power:6, reach:1, shape:1, targetSide:'enemy', cost:{res:0}, cd:0, lines:['別逼我用琴打你!','這下有點走音了。'] },
   song_buff:  { name:'鼓舞之歌', type:'buff', dmgType:99, power:0, reach:0, shape:'all', targetSide:'ally', cost:{res:5}, cd:3, effect:'atkup', effectValue:5, statusDuration:3, lines:['風啊,把勇氣捎給他們!','唱給每一顆心聽。'] },
+  
+  rabbit_buff:  { name:'小兔子無限力量', type:'buff', dmgType:99, power:0, reach:0, shape:'all', targetSide:'ally', cost:{res:5}, cd:0, effect:'atkup', effectValue:500, statusDuration:3, lines:['小兔子們團結起來!','大家加油!'] },
   song_heal:  { name:'安魂曲', type:'heal', dmgType:90, power:8, reach:0, shape:'all', targetSide:'ally', cost:{res:8}, cd:3, lines:['別怕,傷口會記得如何癒合。'] },
 
   smite:      { name:'至聖斬', type:'attack', dmgType:0, power:9, reach:1, shape:1, targetSide:'enemy', cost:{res:0}, cd:0, lines:['震懾於神之威壓吧。'] },
@@ -900,6 +927,10 @@ const SKILL_DB = {
   destroyer_repair:  { name:'維修', type:'heal', dmgType:90, power:100, reach:12, shape:1, targetSide:'ally', cost:{res:0}, cd:0, lines:['……'] },
   // 【v0.33新增】待命：純測試用，不造成任何效果，只是為了讓「沒有實際技能可用的生物」
   // 輪到回合時能在戰報留下紀錄，方便確認AI迴圈真的有輪到它、不是被跳過或卡住
+  /* v0.50-b5：閃光遷躍——瞬間移動（shape:'teleport'）。reach＝最遠幾格（切比雪夫距離，跟其他技能的射程同一種算法）；
+     目標格必須能站、沒人佔；中間有牆／單位／水都無所謂（瞬間移動）。可以跳到戰鬥範圍外的逃跑格，
+     跳過去算「確認撤離」（需要點兩次同一格確認，避免手滑）。想改距離：改 reach；想改冷卻：改 cd。 */
+  flash_leap: { name:'閃光遷躍', type:'utility', dmgType:99, power:0, reach:6, shape:'teleport', targetSide:'self', cost:{res:0}, cd:2, effect:'teleport', lines:['一瞬之間。','空間，讓開。'] },
   standby: { name:'待命', type:'utility', dmgType:99, power:0, reach:0, shape:1, targetSide:'self', cost:{res:0}, cd:0, effect:'standby', lines:['……'] },
 
   // 【v0.28新增】測試用技能，MOMO指定：無冷卻無消耗，方便反覆測試STATUS_DB多stat同時生效
@@ -954,7 +985,7 @@ function freshParty(){
   return [
     makeChar('daren','達倫','劍士', 50, 12, 6, '怒氣', 55, ['slash','heavy','guard',null,null,null,null,'ally_hack'], 
     0, 1),
-    makeChar('sete','賽特','法師', 30, 8, 3, '瑪娜', 30, ['arcane_bolt','fireball','arcane_heal',null,null,null,null,'ally_hack'], 
+    makeChar('sete','賽特','法師', 30, 8, 3, '瑪娜', 30, ['arcane_bolt','fireball','arcane_heal','flash_leap',null,null,null,'ally_hack'], 
     0, 1),
     makeChar('guran','古蘭','吟遊詩人', 32, 7, 3, '靈感', 30, ['lute_bash','song_buff','song_heal','pain_burn',null,null,null,'enemy_hack'], 
     0, 1),
@@ -1266,11 +1297,13 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
    不用刪程式碼、不用找位置，存檔重整後該分頁按鈕會直接消失。
 ============================================================ */
 const TAB_ENABLED = {
+  explore: true,   // v0.50-a：探索（階段A）
   chapters: true,
   prep: true,
   codex: true,
 };
 const NAV_TABS = [
+  {key:'explore', label:'探索'},
   {key:'chapters', label:'章節'},
   {key:'prep', label:'準備'},
   {key:'codex', label:'回顧'},
@@ -1288,17 +1321,28 @@ function renderNav(){
   });
 }
 function switchView(v){
+  if(typeof closeViewOverlay === 'function') closeViewOverlay();   // v0.50-b4：切畫面前先收起角落按鈕開的疊層
   document.querySelectorAll('.navbtn').forEach(b=> b.classList.toggle('active', b.dataset.view===v));
   document.getElementById('viewChapters').style.display = v==='chapters' ? '' : 'none';
   document.getElementById('viewPrep').style.display = v==='prep' ? '' : 'none';
   document.getElementById('viewCodex').style.display = v==='codex' ? '' : 'none';
+  document.getElementById('viewExplore').style.display = v==='explore' ? '' : 'none';
   document.getElementById('viewBattle').style.display = v==='battle' ? '' : 'none';
-  if(v!=='battle' && typeof B3D !== 'undefined') B3D.pause(); // v0.48：離開戰場畫面就停掉3D繪製迴圈
+  if(v!=='battle' && v!=='explore' && typeof B3D !== 'undefined') B3D.pause(); // v0.48：離開戰場畫面就停掉3D繪製迴圈（v0.50-a：探索畫面也用同一個3D）
+  if(v!=='explore' && typeof leaveExplore === 'function') leaveExplore();
+  if(v==='explore') enterExplore();
   if(v==='chapters') renderChapters();
   if(v==='prep'){ advancePrepBg(); renderPrep(); }
   if(v==='codex') renderCodex();
   if(v==='codex') renderCodex();
 }
+/* 戰鬥結束離場統一從這裡走：探索觸發的戰鬥回探索，其他回準備畫面 */
+function battleLeave(){
+  if(battle) battle.left = true;
+  if(battle && battle.fromExplore && typeof exploreBattleEnded === 'function'){ exploreBattleEnded(); return; }
+  switchView('prep');
+}
+function battleReturnLabel(en){ const x = battle && battle.fromExplore; return en ? (x ? 'Return 返回探索' : 'Return 返回準備畫面') : (x ? '返回探索' : '返回準備畫面'); }
 function setNavLocked(locked){
   document.querySelectorAll('.navbtn').forEach(b=>{
     if(b.dataset.view === 'battle') return;
@@ -2224,6 +2268,8 @@ const ENEMY_TEMPLATES = {
   // v0.26：atk/def/armor → patk/pdef/pres，eatk/edef/eres、matk/mdef/mres先給0佔位
   goblin: ()=> ({ id:nextEnemyId('goblin'), portraitKey:'goblin', name:'哥布林'+String.fromCharCode(65+(__goblinNameCounter++ % 26)), side:'enemy', hp:20,maxHp:20, patk:6, pdef:1, spd:10, pres:0, eatk:0,edef:0,eres:0, matk:0,mdef:0,mres:0, resName:'-', res:0, resMax:0, skills:['goblin_hit'], alive:true }),
   goblinShaman: ()=> ({ id:nextEnemyId('goblinShaman'), portraitKey:'goblin', name:'哥布林薩滿', side:'enemy', hp:16,maxHp:16, patk:4, pdef:1, spd:10, pres:0, eatk:0,edef:0,eres:0, matk:0,mdef:0,mres:0, resName:'-', res:0, resMax:0, skills:['goblin_hit','goblin_heal'], alive:true }),
+  /* v0.50-b5：小兔子——測試用巡邏隊成員：全屬性0、HP只有1（一打就死）、笑點技能【小兔子無限力量】。stationary＝戰鬥中不會動。 */
+  rabbit: ()=> ({ id:nextEnemyId('rabbit'), portraitKey:'rabbit', name:'小兔子', side:'enemy', hp:1,maxHp:1, patk:0, pdef:0, spd:0, pres:0, eatk:0,edef:0,eres:0, matk:0,mdef:0,mres:0, resName:'-', res:0, resMax:0, skills:['rabbit_buff'], stationary:true, alive:true }),
   // v0.26新增：拜亞基——詛咒之詩(debuff)+痛苦燃燒(火焰單體)，sanity機制尚未實作，這隻先用既有系統組出來
   byakhee: ()=> ({ id:nextEnemyId('byakhee'), portraitKey:'byakhee', name:'拜亞基'+String.fromCharCode(65+(__byakheeNameCounter++ % 26)), side:'enemy', hp:30,maxHp:30, patk:8, pdef:2, spd:12, pres:0, eatk:0,edef:0,eres:0, matk:0,mdef:0,mres:0, resName:'-', res:0, resMax:0, skills:['curse_verse','pain_burn'], alive:true }),
   // v0.28新增：測試用不移動敵人兩種——
@@ -2345,6 +2391,8 @@ function parseMapDef(id, def){
     floorItems: (def.floorItems || []).map(f=>({x:f.x,y:f.y,item:f.item})),
     effects: (def.effects || []).map(e=>({x:e.x,y:e.y,type:e.type||'fire',turns:e.turns!=null?e.turns:FIRE_DEFAULT_TURNS})),
     events: def.events || [],   // 【預留】場地事件，目前只存不執行
+    start: def.start ? [def.start[0], def.start[1]] : null,   // v0.50-a：探索區域的起點
+    arenas: def.arenas || [],                                 // v0.50-a：探索區域的戰鬥範圍
   });
   out.ok = out.errors.length === 0;
   return out;
@@ -2414,7 +2462,7 @@ function pathFromPrev(r, x, y){
    檢查項：尺寸一致、字元合法、出生點在地圖內且可站且不重複、我方每個出生點都走得到敵方每個出生點、
    沒有「可站立卻永遠走不到」的孤島格、可站立格數夠用、物品/效果位置合法。
    unitCount={allies,enemies}：實際單位數（開戰時才知道），可省略（只驗地圖本身）。 */
-function validateMapDef(map, unitCount){
+function validateMapDef(map, unitCount, mode){   // mode==='zone'：探索區域（沒有出生點，改驗起點）
   const errors = map.errors.slice(), warnings = map.warnings.slice();
   if(errors.length) return { ok:false, errors, warnings };
   const std = (x,y)=> mapIn(map,x,y) && mapTerrain(map,x,y).passable;
@@ -2427,14 +2475,15 @@ function validateMapDef(map, unitCount){
       const k = x+','+y; if(seen[k]) errors.push(`出生點(${x},${y})重複（${seen[k]}與${label}）`); seen[k] = label;
     });
   };
-  checkSpawns(map.allySpawns, '我方'); checkSpawns(map.enemySpawns, '敵方');
+  if(mode === 'zone'){ if(!map.start || !std(map.start[0], map.start[1])) errors.push('探索起點無效（在地圖外或不能站）'); }
+  else { checkSpawns(map.allySpawns, '我方'); checkSpawns(map.enemySpawns, '敵方'); }
   // 可站立格數
   let open = 0; for(let y=0;y<map.rows;y++) for(let x=0;x<map.cols;x++) if(std(x,y)) open++;
-  const units = unitCount ? (unitCount.allies + unitCount.enemies) : (map.allySpawns.length + map.enemySpawns.length);
+  const units = unitCount ? (unitCount.allies + unitCount.enemies) : (mode === 'zone' ? 1 : (map.allySpawns.length + map.enemySpawns.length));
   const need = Math.max(MAP_MIN_OPEN_TILES, units * MAP_OPEN_TILES_PER_UNIT);
   if(open < need) errors.push(`可站立格子只有${open}，至少需要${need}`);
   // 連通性：從第一個我方出生點出發（只看地形規則，不看單位）
-  const firstOk = map.allySpawns.find(([x,y])=>std(x,y));
+  const firstOk = mode === 'zone' ? ((map.start && std(map.start[0], map.start[1])) ? map.start : null) : map.allySpawns.find(([x,y])=>std(x,y));
   if(firstOk){
     const r = mapDijkstra(map, [[firstOk[0],firstOk[1],0]], { step:(ax,ay,bx,by)=>mapStepCost(map,'walk',ax,ay,bx,by) });
     const reach = (x,y)=> r.dist[y*map.cols+x] < Infinity;
@@ -2613,6 +2662,11 @@ const BATTLES = {
     enemies: ()=> [ ENEMY_TEMPLATES.byakhee(), ENEMY_TEMPLATES.byakhee(), ENEMY_TEMPLATES.byakhee() ],
     unlockFlag:'defeated_byakhee_trio',
   },
+  // v0.50-b5：小兔子巡邏隊（4隻，隊長＝第一隻）。用在探索的動態戰場，map只是借用平地的規格檢查，實際戰場大小由雙方隊長位置決定
+  rabbit_patrol: {
+    name:'小兔子巡邏隊', titleEn:'Rabbit Patrol', map:'flat12', isBoss:false, bg:'assets/images/bg002.png',
+    enemies: ()=> [ ENEMY_TEMPLATES.rabbit(), ENEMY_TEMPLATES.rabbit(), ENEMY_TEMPLATES.rabbit(), ENEMY_TEMPLATES.rabbit() ],
+  },
   // v0.28新增：四隻不動人偶，各自獨立一場戰鬥，分別掛在四個章節（原本訓練人偶+弓箭人偶合併的training_ground拆開）
   // 都沒設定bgm欄位，會自動落回下面startBattle()裡的預設值(assets/bgms/bgm006.mp3)，順便驗證「沒設定時吃預設」這條路徑
   training_dummy_solo: {
@@ -2671,6 +2725,36 @@ function isAiControlled(u){ return !!u && (u.side === 'enemy' || !!(battle && ba
 function noteProgress(){ if(battle) battle.lastProgressRound = battle.round; }
 
 /* v0.48：依出生點清單擺放單位；單位比出生點多時，不再疊在同一格（舊版會疊），改成找最近的空地 */
+/* 【v0.50-b3】開戰站位（探索觸發）：隊長站在「進入的那一格」（夾進範圍內縮 BATTLE_FORMATION_INSET 格的內側），
+   隊友依 BATTLE_FORMATION 的相對位置排在隊長身後／兩側（[身後幾格, 側邊幾格]，方向＝進場時的前進方向）。
+   落在牆／範圍外／被佔的格子，會在範圍內找最近的空格。之後要開放預設隊形，就是換這張表。 */
+const BATTLE_FORMATION = [[0,0],[1,-1],[1,1],[2,0],[2,-2],[2,2],[3,-1],[3,1]];
+const BATTLE_FORMATION_INSET = 2;
+function formationSpawns(n, map, arena, entry, taken){
+  const a = arena, used = new Set(taken), res = [];
+  const clamp = (v,lo,hi)=> Math.max(lo, Math.min(hi, v));
+  const ins = Math.min(BATTLE_FORMATION_INSET, Math.floor((Math.min(a.w,a.h)-1)/2));
+  const ax = clamp(entry.x, a.x+ins, a.x+a.w-1-ins), ay = clamp(entry.y, a.y+ins, a.y+a.h-1-ins);
+  let fx = Math.sign(entry.dx||0), fy = Math.sign(entry.dy||0); if(!fx && !fy) fx = 1;
+  const ok = (x,y)=> x>=a.x && x<a.x+a.w && y>=a.y && y<a.y+a.h && mapIn(map,x,y) && mapTerrain(map,x,y).passable && !used.has(x+','+y);
+  for(let i=0;i<n;i++){
+    const f = BATTLE_FORMATION[i] || [3 + Math.floor((i-BATTLE_FORMATION.length)/2) + 1, (i%2 ? 1 : -1) * (1 + Math.floor((i-BATTLE_FORMATION.length)/2))];
+    const bx = f[0], sx = f[1];
+    let p = [ax - fx*bx - fy*sx, ay - fy*bx + fx*sx];
+    if(!ok(p[0],p[1])){
+      let found = null;
+      const base = [clamp(p[0],a.x,a.x+a.w-1), clamp(p[1],a.y,a.y+a.h-1)];
+      for(let rad=0; rad<=Math.max(a.w,a.h) && !found; rad++)
+        for(let dy=-rad; dy<=rad && !found; dy++) for(let dx=-rad; dx<=rad && !found; dx++){
+          if(Math.max(Math.abs(dx),Math.abs(dy)) !== rad) continue;
+          if(ok(base[0]+dx, base[1]+dy)) found = [base[0]+dx, base[1]+dy];
+        }
+      p = found || base;
+    }
+    used.add(p[0]+','+p[1]); res.push(p);
+  }
+  return res;
+}
 function placeOnSpawns(units, spawns, map, taken){
   units.forEach((u,i)=>{
     let p = spawns[i];
@@ -2703,10 +2787,11 @@ function startBattle(battleKey, chapterId, opts){
   const def = BATTLES[battleKey];
   // v0.48：每場戰鬥自己的地圖（def.map＝BATTLE_MAPS的key，沒填就用平地flat12）；不合格的地圖拒絕開戰
   const mapId = def.map || 'flat12';
-  const map = getBattleMap(mapId);
-  if(!map.ok){
-    console.error('[battle] 地圖「'+mapId+'」不合格，無法開戰：', map.errors);
-    toast('地圖資料有誤，無法開戰（詳見console）：' + map.errors[0]);
+  const src = getBattleMap(mapId);          // 戰鬥地圖資料（出生點、效果、地上物品；就地戰鬥時座標要加上範圍的左上角偏移）
+  const arenaOpt = opts.arena || null;      // v0.50-b2：探索觸發時傳入的戰鬥範圍 {x,y,w,h}，地圖改用探索的大地圖(opts.zoneMap)
+  if(!src.ok){
+    console.error('[battle] 地圖「'+mapId+'」不合格，無法開戰：', src.errors);
+    toast('地圖資料有誤，無法開戰（詳見console）：' + src.errors[0]);
     return false;
   }
   __goblinNameCounter = 0; // 每次開戰重置顯示名稱計數器，讓哥布林命名固定從A開始，不會累計到上次挑戰的字母
@@ -2735,27 +2820,36 @@ function startBattle(battleKey, chapterId, opts){
 
   if(opts.allyStationary) allies.forEach(a=>{ a.stationary = true; }); // 測試用：我方不移動（驗證敵方尋路）
   // v0.48：單位數量決定後，用實際數量再驗一次地圖（可站格數是否夠、出生點是否連通）
-  const vr = validateMapDef(map, { allies: allies.length, enemies: enemies.length });
+  const vr = validateMapDef(src, { allies: allies.length, enemies: enemies.length });
   if(!vr.ok){
     console.error('[battle] 地圖「'+mapId+'」與本場單位數不合：', vr.errors);
     toast('地圖與單位數不合，無法開戰：' + vr.errors[0]);
     return false;
   }
+  const map = arenaOpt ? opts.zoneMap : src;   // 實際用來畫、走、算的地圖
+  const ox = arenaOpt ? arenaOpt.x : 0, oy = arenaOpt ? arenaOpt.y : 0, off = l=> l.map(p=>[p[0]+ox, p[1]+oy]);
   // 棋盤尺寸改成「每場戰鬥自己的」：BOARD_COLS/ROWS是let，開戰時依地圖設定
   BOARD_COLS = map.cols; BOARD_ROWS = map.rows;
 
   // v0.48：開戰站位改吃地圖資料的 allySpawns/enemySpawns（依上場/生成順序對應；超出的單位找最近空地，不會疊格）
   const taken = new Set();
-  placeOnSpawns(allies, map.allySpawns, map, taken);
-  placeOnSpawns(enemies, map.enemySpawns, map, taken);
+  // 敵方先放（固定在戰鬥的出生點，就是探索時看到他們站的位置），我方再排；探索觸發時我方改用隊長相對隊形
+  if(arenaOpt && opts.enemyEntry) formationSpawns(enemies.length, map, arenaOpt, opts.enemyEntry, taken).forEach((p,i)=>{ enemies[i].x = p[0]; enemies[i].y = p[1]; taken.add(p[0]+','+p[1]); });   // v0.50-b5：動態戰場——敵方隊長站在自己的位置，隊員排在他身後
+  else placeOnSpawns(enemies, off(src.enemySpawns), map, taken);
+  if(arenaOpt && opts.entry){
+    allies.sort((p,q)=> (q.id === opts.leaderId) - (p.id === opts.leaderId));   // 隊長排第一
+    const fs = formationSpawns(allies.length, map, arenaOpt, opts.entry, taken);
+    allies.forEach((u,i)=>{ u.x = fs[i][0]; u.y = fs[i][1]; taken.add(u.x+','+u.y); });
+  } else placeOnSpawns(allies, off(src.allySpawns), map, taken);
 
   const effects = {};
-  map.effects.forEach(e=>{ effects[e.x+','+e.y] = { type:e.type, turns:e.turns }; });
+  if(!opts.enemyEntry) src.effects.forEach(e=>{ effects[(e.x+ox)+','+(e.y+oy)] = { type:e.type, turns:e.turns }; });   // 動態戰場不帶地圖的效果／地上物品
   const floorItems = {};
-  map.floorItems.forEach(f=>{ floorItems[f.x+','+f.y] = f.item; });
+  if(!opts.enemyEntry) src.floorItems.forEach(f=>{ floorItems[(f.x+ox)+','+(f.y+oy)] = f.item; });
 
   battle = {
     def, allies, enemies, map,
+    arena: arenaOpt ? { x:arenaOpt.x, y:arenaOpt.y, w:arenaOpt.w, h:arenaOpt.h } : null,   // v0.50-b2：就地戰鬥的範圍；範圍外＝逃跑格
     chapterId: chapterId != null ? chapterId : null,
     key: battleKey,         // v0.47：這場戰鬥的BATTLES key，結算時用來判斷「是不是第一次勝利」
     introPlaying: false,    // v0.47：開場演出進行中(true)時鎖住輸入、行動面板不自動彈出、敵方不行動
@@ -2775,6 +2869,7 @@ function startBattle(battleKey, chapterId, opts){
     roundCap: opts.roundCap || DEADLOCK_ROUND_CAP, // v0.48：回合數上限
     drawReason: null,       // v0.48：非null＝本場判定膠著收場（'cap'回合上限／'stalemate'連續多回合無人掉血）
     aiActions: 0,           // v0.48：敵方本回合已做幾次決策（防無限迴圈）
+    fromExplore: !!opts.fromExplore, // v0.50-b：從探索模式觸發的戰鬥，結束後回探索而不是準備畫面
     test: !!opts.test, auto: !!opts.auto, onEnd: opts.onEnd || null, violations: [], // v0.48：自動測試用
   };
   rollOrder();
@@ -2788,13 +2883,22 @@ function startBattle(battleKey, chapterId, opts){
   }
   // v0.47：進場改成完整開場序列（黑幕→標題→退去→單位進場→COMMENCE→開戰），見playBattleIntro()。
   // 畫面蓋滿黑幕的當下才真正切到戰鬥畫面；序列期間battle.introPlaying=true，序列結束才解鎖並開始第一個行動。
+  if(opts.exploreUnits && battleIntroIsDim(def)){
+    /* v0.50-b8：探索觸發的小型戰鬥——戰鬥單位沿用探索單位的畫面位置（_v），開場「人物進場」時才從原位走到隊形位置，不再瞬移；
+       我方依 id 對應、敵方依順序對應（沒對應到的單位照舊直接出現）。 */
+    battle.walkIn = true;
+    const exu = opts.exploreUnits;
+    const take = (u, src)=>{ if(src && src._v){ u._v = src._v; u._faceRight = src._faceRight; u._hold = true; u._capWalk = true; } };
+    allies.forEach(u=> take(u, exu.allies[u.id]));
+    enemies.forEach((u,i)=> take(u, exu.enemies[i]));
+  }
   battle.introPlaying = true;
   playBattleIntro(def, ()=>{
     // v0.28：不再只靠isBoss二分，改吃每場戰鬥自己的bgm欄位，沒設定就用預設值
-    playBgm(def.bgm || 'assets/bgms/bgm006.mp3');
+    playBgm(def.bgm || BGM_TABLE.battle);
     switchView('battle');
     setNavLocked(true);
-    allUnits().forEach(u=>{ u._introHide = true; }); // v0.48：單位先藏起來，等「人物進場」那一步才從兩側滑入
+    if(!battleIntroIsDim(def)) allUnits().forEach(u=>{ u._introHide = true; }); // v0.48：單位先藏起來，等「人物進場」那一步才從兩側滑入
     renderBattle();
   }).catch(err=> console.error('battle intro error', err)).finally(finishBattleIntro);
   return true;
@@ -2865,6 +2969,12 @@ function logMsg(html){
   miniLogPush(html); // v0.47：同步丟一份給底部迷你戰報
 }
 
+/* 【v0.50-b】BGM 用途對照表：想換哪一首，直接改這裡的檔名就好（檔案放 assets/bgms/，bgm000~bgm020）。
+   explore＝探索地圖；battle＝戰鬥預設（各場戰鬥自己有 bgm 欄位時以該場為準）。之後要加用途（城鎮、Boss、勝利…）在這裡加一行、在要播的地方用 BGM_TABLE.xxx。 */
+const BGM_TABLE = {
+  explore: 'assets/bgms/bgm000.mp3',
+  battle:  'assets/bgms/bgm006.mp3',
+};
 function playBgm(file){
   const bgm = document.getElementById('bgm');
   if(bgm.getAttribute('data-cur') === file) return;
@@ -2902,11 +3012,13 @@ const STAGE3D = {
   zoomMinDist: 6,        // 最近能拉到多近（鏡頭到目標的距離，單位＝格）
   zoomMaxMul: 3.0,       // 最遠＝地圖最長邊×此值
   dragThresholdPx: 6,    // 手指/滑鼠移動超過幾px才算「拖曳」，沒超過算「點擊」
+  holdMs: 250,           // v0.50-a3：探索時在地面按住不動超過幾毫秒，進入「跟隨模式」（隊長持續走向滑鼠）
   rotateSensYaw: 0.006,  // 拖曳旋轉靈敏度（水平）
   rotateSensPitch: 0.005,// 拖曳旋轉靈敏度（垂直）
   wheelZoomSens: 0.001,  // 滾輪縮放靈敏度
   spriteH: 1.45,         // 角色看板高度（單位＝格）
   spriteMaxW: 1.5,       // 角色看板最大寬度
+  walkCapSec: 1.5,       // v0.50-b8：開戰走位／戰後走回的整段上限秒數（路太長的單位會加速，讓大家差不多同時到）
   moveSecPerTile: 0.16,  // 單位走一格要幾秒（移動動畫）
   hopHeight: 0.16,       // 走路時每步小跳的高度
   moveAnim: true,        // false＝移動時直接瞬移
@@ -2914,7 +3026,8 @@ const STAGE3D = {
   wallFadeSpeed: 8,      // 岩壁淡入淡出速度
   gridLineAlpha: 0.16,   // 格線濃度
   introSlideTiles: 4,    // 開場進場滑入的距離（格）
-  colYellow: [0.79,0.64,0.15,0.42],  // 可選取/可移動格
+  colYellow: [0.79,0.64,0.15,0.42],  // 技能射程/可選取格
+  colMove:   [0.22,0.74,0.88,0.44],  // v0.49：可移動格（水藍）。想換色改這一行 [R,G,B,透明度]，數值0~1
   colRed:    [0.80,0.30,0.16,0.54],  // 技能生效範圍/目標
   colPath:   [1,0.85,0.2,0.62],      // 滑鼠懸停的路徑預覽
   colActor:  [1,0.9,0.4,0.38],       // 目前行動者腳下
@@ -2929,14 +3042,15 @@ const B3D = (function(){
   const S = STAGE3D;
   let wrap=null, cv=null, ov=null, gl=null, glOK=false, running=false, rafId=0, texWarned=false;
   let map=null, mapVer=0;
-  let scene = { units:[], actor:null, yellow:[], red:[], redUnits:[], floorItems:[], effects:[], hoverPathFn:null, spriteSrc:null, onBadSprite:null, pathFn:null };
+  let scene = { units:[], actor:null, rects:[], yellow:[], move:[], red:[], redUnits:[], floorItems:[], effects:[], hoverPathFn:null, routeFn:null, routeCol:null, spriteSrc:null, onBadSprite:null, pathFn:null };
   const P = {}; let TX = {}; const texCache = new Map(), badgeCache = new Map();
-  let meshBuf=null, meshN=0, lineBuf=null, lineN=0, dynBuf=null;
+  let chunks=[], dynBuf=null, ex=null;          // v0.50-a：地形切成16×16的區塊各自一份緩衝；ex＝探索模式設定(null＝戰鬥)
+  var CH=16;
   let rocks=[], rockBuf=null;                 // 岩壁：每格一份模板，每幀依透明度組裝
   let waterList=[], poisonList=[];
   let tags = new Map();                       // 單位id → {el,u}
   let hoverTile=null, hoverPath=null, tm=0, lastT=0, fpsAvg=60;
-  let onTapCb=null;
+  let onTapCb=null, onHoldCb=null;
   const cam = { yaw:0, tyaw:0, pitch:1.0, tp:1.0, dist:20, tx:6, ty:0.5, tz:6 };
   let fly=null, tiltA=0, bbUp=[0,1,0], camR=[1,0,0], eye=[0,10,0];
   let vp=new Float32Array(16), ivp=new Float32Array(16);
@@ -2987,13 +3101,15 @@ const B3D = (function(){
     function sh(t,s){var o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o));return o;}
     function prog(vs,fs,binds){var p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
       for(var i=0;i<binds.length;i++)gl.bindAttribLocation(p,i,binds[i]);gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))console.error(gl.getProgramInfoLog(p));
-      p.uVP=gl.getUniformLocation(p,'uVP');p.uCut=gl.getUniformLocation(p,'uCut');return p;}
-    P.mesh = prog('attribute vec3 aPos;attribute vec3 aN;attribute vec4 aC;uniform mat4 uVP;varying vec4 vC;void main(){vec3 L=normalize(vec3(-0.45,-0.8,-0.35));float d=max(dot(aN,-L),0.0);float sky=0.5+0.5*aN.y;vec3 amb=mix(vec3(0.36,0.34,0.33),vec3(0.52,0.58,0.68),sky);vC=vec4(aC.rgb*(amb+vec3(1.0,0.93,0.82)*d*0.66),aC.a);gl_Position=uVP*vec4(aPos,1.0);}',
-      'precision mediump float;varying vec4 vC;void main(){gl_FragColor=vC;}',['aPos','aN','aC']);
-    P.ovl = prog('attribute vec3 aPos;attribute vec4 aC;uniform mat4 uVP;varying vec4 vC;void main(){vC=aC;gl_Position=uVP*vec4(aPos,1.0);}',
-      'precision mediump float;varying vec4 vC;void main(){gl_FragColor=vC;}',['aPos','aC']);
-    P.bb = prog('attribute vec3 aPos;attribute vec2 aUV;attribute vec4 aT;uniform mat4 uVP;varying vec2 vUV;varying vec4 vT;void main(){vUV=aUV;vT=aT;gl_Position=uVP*vec4(aPos,1.0);}',
-      'precision mediump float;uniform sampler2D uT;uniform float uCut;varying vec2 vUV;varying vec4 vT;void main(){vec4 c=texture2D(uT,vUV)*vT;if(c.a<uCut)discard;gl_FragColor=c;}',['aPos','aUV','aT']);
+      p.uVP=gl.getUniformLocation(p,'uVP');p.uCut=gl.getUniformLocation(p,'uCut');p.uFog=gl.getUniformLocation(p,'uFog');p.uFogB=gl.getUniformLocation(p,'uFogB');return p;}
+    var FP='#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n';
+    var FOGF='uniform vec4 uFog;uniform vec2 uFogB;float fogD(vec2 w){return length(w-uFog.xy);}float fogDark(vec2 w){return uFog.w>uFog.z?clamp((fogD(w)-uFog.z)/(uFog.w-uFog.z),0.0,1.0)*uFogB.y:0.0;}float fogOut(vec2 w){return uFogB.x>uFog.w?clamp((fogD(w)-uFog.w)/(uFogB.x-uFog.w),0.0,1.0):0.0;}';
+    P.mesh = prog('attribute vec3 aPos;attribute vec3 aN;attribute vec4 aC;uniform mat4 uVP;varying vec4 vC;varying vec2 vW;void main(){vec3 L=normalize(vec3(-0.45,-0.8,-0.35));float d=max(dot(aN,-L),0.0);float sky=0.5+0.5*aN.y;vec3 amb=mix(vec3(0.36,0.34,0.33),vec3(0.52,0.58,0.68),sky);vC=vec4(aC.rgb*(amb+vec3(1.0,0.93,0.82)*d*0.66),aC.a);vW=aPos.xz;gl_Position=uVP*vec4(aPos,1.0);}',
+      FP+'varying vec4 vC;varying vec2 vW;'+FOGF+'void main(){gl_FragColor=vec4(vC.rgb*(1.0-fogDark(vW)),vC.a*(1.0-fogOut(vW)));}',['aPos','aN','aC']);
+    P.ovl = prog('attribute vec3 aPos;attribute vec4 aC;uniform mat4 uVP;varying vec4 vC;varying vec2 vW;void main(){vC=aC;vW=aPos.xz;gl_Position=uVP*vec4(aPos,1.0);}',
+      FP+'varying vec4 vC;varying vec2 vW;'+FOGF+'void main(){gl_FragColor=vec4(vC.rgb,vC.a*(1.0-fogOut(vW))*(1.0-fogDark(vW)*0.6));}',['aPos','aC']);
+    P.bb = prog('attribute vec3 aPos;attribute vec2 aUV;attribute vec4 aT;uniform mat4 uVP;varying vec2 vUV;varying vec4 vT;varying vec2 vW;void main(){vUV=aUV;vT=aT;vW=aPos.xz;gl_Position=uVP*vec4(aPos,1.0);}',
+      FP+'uniform sampler2D uT;uniform float uCut;varying vec2 vUV;varying vec4 vT;varying vec2 vW;'+FOGF+'void main(){vec4 c=texture2D(uT,vUV)*vT;c.a*=1.0-fogOut(vW);if(uFog.w>uFog.z)c.a*=1.0-clamp((fogD(vW)-uFog.z)/2.0,0.0,1.0);if(c.a<uCut)discard;gl_FragColor=c;}',['aPos','aUV','aT']);
     dynBuf = gl.createBuffer();
     TX.blob = texFromCanvas(drawBlob()); TX.circle = texFromCanvas(drawCircle()); TX.flame = texFromCanvas(drawFlame()); TX.star = texFromCanvas(drawStar());
   }
@@ -3058,48 +3174,59 @@ const B3D = (function(){
   }
   function freeMap(){
     if(!gl) return;
-    [meshBuf,lineBuf,rockBuf].forEach(function(b){if(b)gl.deleteBuffer(b);});
-    meshBuf=lineBuf=rockBuf=null;
+    chunks.forEach(function(c){if(c.mesh)gl.deleteBuffer(c.mesh);if(c.line)gl.deleteBuffer(c.line);});
+    chunks=[];
+    if(rockBuf){gl.deleteBuffer(rockBuf);rockBuf=null;}
   }
   function buildMesh(){
     if(!glOK||!map) return;
     freeMap();
-    var mesh=[],lines=[];rocks=[];waterList=[];poisonList=[];
-    for(var z=0;z<map.rows;z++)for(var x=0;x<map.cols;x++){
-      var t=map.T[z][x],T=topY(x,z),col=tileCol(x,z);
-      if(t==='r'){var g=[];tileGeo(g,x,z,t,T,col,true);rocks.push({x:x,z:z,geo:g,a:1,ta:1});}
-      else tileGeo(mesh,x,z,t,T,col,false);
-      if(t==='w')waterList.push([x,z]);else if(t==='p')poisonList.push([x,z]);
-      var y=T+0.012,c=[0,0,0,S.gridLineAlpha],e=0.01,Q=[[x+e,z+e],[x+1-e,z+e],[x+1-e,z+1-e],[x+e,z+1-e]];
-      for(var i=0;i<4;i++){var A=Q[i],B=Q[(i+1)%4];lines.push(A[0],y,A[1],c[0],c[1],c[2],c[3],B[0],y,B[1],c[0],c[1],c[2],c[3]);}
+    rocks=[];waterList=[];poisonList=[];
+    var ncx=Math.ceil(map.cols/CH),ncz=Math.ceil(map.rows/CH);
+    for(var cz=0;cz<ncz;cz++)for(var cx=0;cx<ncx;cx++){
+      var mesh=[],lines=[],x0=cx*CH,z0=cz*CH,x1=Math.min(map.cols,x0+CH),z1=Math.min(map.rows,z0+CH);
+      for(var z=z0;z<z1;z++)for(var x=x0;x<x1;x++){
+        var t=map.T[z][x],T=topY(x,z),col=tileCol(x,z);
+        if(t==='r'){var g=[];tileGeo(g,x,z,t,T,col,true);rocks.push({x:x,z:z,geo:g,a:1,ta:1});}
+        else tileGeo(mesh,x,z,t,T,col,false);
+        if(t==='w')waterList.push([x,z]);else if(t==='p')poisonList.push([x,z]);
+        var y=T+0.012,c=[0,0,0,S.gridLineAlpha],e=0.01,Q=[[x+e,z+e],[x+1-e,z+e],[x+1-e,z+1-e],[x+e,z+1-e]];
+        for(var i=0;i<4;i++){var A=Q[i],B=Q[(i+1)%4];lines.push(A[0],y,A[1],c[0],c[1],c[2],c[3],B[0],y,B[1],c[0],c[1],c[2],c[3]);}
+      }
+      var ch={x0:x0,z0:z0,x1:x1,z1:z1,mesh:gl.createBuffer(),line:gl.createBuffer(),meshN:mesh.length/10,lineN:lines.length/7};
+      gl.bindBuffer(gl.ARRAY_BUFFER,ch.mesh);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(mesh),gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER,ch.line);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(lines),gl.STATIC_DRAW);
+      chunks.push(ch);
     }
-    meshBuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,meshBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(mesh),gl.STATIC_DRAW);meshN=mesh.length/10;
-    lineBuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,lineBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(lines),gl.STATIC_DRAW);lineN=lines.length/7;
     rockBuf=gl.createBuffer();
   }
+  /* v0.50-a：探索模式的可見視窗（以鏡頭目標為中心的方形）；戰鬥模式回傳null＝全部都畫 */
+  function viewWin(){if(!ex)return null;var R=ex.radius+ex.dim+ex.out+2;return{x0:cam.tx-R,x1:cam.tx+R,z0:cam.tz-R,z1:cam.tz+R};}
+  function fogSet(p){if(ex){gl.uniform4f(p.uFog,cam.tx,cam.tz,ex.radius,ex.radius+ex.dim);gl.uniform2f(p.uFogB,ex.radius+ex.dim+ex.out,ex.dark);}else{gl.uniform4f(p.uFog,0,0,0,0);gl.uniform2f(p.uFogB,0,0);}}
 
   /* ---------- 相機 ---------- */
-  function maxSide(){return map?Math.max(map.cols,map.rows):12;}
+  function maxSide(){return ex&&ex.fit?ex.fit:(map?Math.max(map.cols,map.rows):12);}
   /* 全圖取景距離：俯視約＝地圖邊長×1.44；斜視時近處的格子會放大，所以視角越低要拉得越遠（1.1是實測係數，想讓全圖留更多邊就調大） */
   function overviewDist(pitch){var asp=cv.clientWidth/Math.max(1,cv.clientHeight);return maxSide()*(1.44+1.1*(1.45-(pitch==null?cam.tp:pitch)))/Math.min(1,asp);}
   function clampCam(){var N=maxSide();cam.pitch=Math.max(S.pitchMin,Math.min(S.pitchMax,cam.pitch));cam.tp=Math.max(S.pitchMin,Math.min(S.pitchMax,cam.tp));
-    cam.dist=Math.max(S.zoomMinDist,Math.min(N*S.zoomMaxMul,cam.dist));cam.tx=Math.max(0,Math.min(map?map.cols:N,cam.tx));cam.tz=Math.max(0,Math.min(map?map.rows:N,cam.tz));}
+    cam.dist=Math.max(S.zoomMinDist,Math.min(ex?ex.maxDist:N*S.zoomMaxMul,cam.dist));cam.tx=Math.max(0,Math.min(map?map.cols:N,cam.tx));cam.tz=Math.max(0,Math.min(map?map.rows:N,cam.tz));}
   function updateCam(dt){
-    if(fly){fly.t=Math.min(1,fly.t+dt/0.8);var ee=fly.t<0.5?2*fly.t*fly.t:1-Math.pow(-2*fly.t+2,2)/2;cam.dist=fly.d0+(fly.d1-fly.d0)*ee;cam.tx=fly.x0+(fly.x1-fly.x0)*ee;cam.tz=fly.z0+(fly.z1-fly.z0)*ee;if(fly.t>=1)fly=null;}
+    if(fly){fly.t=Math.min(1,fly.t+dt/(fly.dur||0.8));var ee=fly.t<0.5?2*fly.t*fly.t:1-Math.pow(-2*fly.t+2,2)/2;cam.dist=fly.d0+(fly.d1-fly.d0)*ee;cam.tx=fly.x0+(fly.x1-fly.x0)*ee;cam.tz=fly.z0+(fly.z1-fly.z0)*ee;if(fly.t>=1){if(fly.after&&ex)ex.follow=fly.after;fly=null;}}
     var k=Math.min(1,dt*9);cam.yaw+=(cam.tyaw-cam.yaw)*k;cam.pitch+=(cam.tp-cam.pitch)*k;clampCam();
     var cp=Math.cos(cam.pitch);tiltA=Math.max(0,Math.min(1,(cam.pitch-0.85)/0.45));
     var spp=Math.sin(cam.pitch),bx0=-spp*Math.sin(cam.yaw)*tiltA,by0=1-tiltA+cp*tiltA,bz0=-spp*Math.cos(cam.yaw)*tiltA,bl0=Math.hypot(bx0,by0,bz0)||1;bbUp=[bx0/bl0,by0/bl0,bz0/bl0];
     eye=[cam.tx+cam.dist*cp*Math.sin(cam.yaw),cam.ty+cam.dist*Math.sin(cam.pitch),cam.tz+cam.dist*cp*Math.cos(cam.yaw)];
     var asp=cv.width/Math.max(1,cv.height);
     vp=mul(persp(S.fov,asp,Math.max(0.5,cam.dist*0.05),cam.dist+maxSide()*2),lookAt(eye,[cam.tx,cam.ty,cam.tz],[0,1,0]));ivp=inv(vp);camR=[Math.cos(cam.yaw),0,-Math.sin(cam.yaw)];}
-  function pan(dx,dy){var s=cam.dist*0.0017,f=[-Math.sin(cam.yaw),-Math.cos(cam.yaw)];cam.tx+=-camR[0]*dx*s+f[0]*dy*s;cam.tz+=-camR[2]*dx*s+f[1]*dy*s;clampCam();}
+  function pan(dx,dy){if(ex)return;var s=cam.dist*0.0017,f=[-Math.sin(cam.yaw),-Math.cos(cam.yaw)];cam.tx+=-camR[0]*dx*s+f[0]*dy*s;cam.tz+=-camR[2]*dx*s+f[1]*dy*s;clampCam();}
   function unproj(x,y,z){var m=ivp,w=m[3]*x+m[7]*y+m[11]*z+m[15];return[(m[0]*x+m[4]*y+m[8]*z+m[12])/w,(m[1]*x+m[5]*y+m[9]*z+m[13])/w,(m[2]*x+m[6]*y+m[10]*z+m[14])/w];}
   function project(x,y,z){var m=vp,w=m[3]*x+m[7]*y+m[11]*z+m[15],nx=(m[0]*x+m[4]*y+m[8]*z+m[12])/w,ny=(m[1]*x+m[5]*y+m[9]*z+m[13])/w,r=cv.getBoundingClientRect();return[r.left+(nx+1)/2*r.width,r.top+(1-ny)/2*r.height,w];}
   function pickTile(cx,cy){
     if(!map) return null;
     var r=cv.getBoundingClientRect(),nx=(cx-r.left)/r.width*2-1,ny=1-(cy-r.top)/r.height*2,a=unproj(nx,ny,-1),b=unproj(nx,ny,1),d=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],l=Math.hypot(d[0],d[1],d[2]);d=[d[0]/l,d[1]/l,d[2]/l];
-    var best=null,bt=Infinity;
-    for(var z=0;z<map.rows;z++)for(var x=0;x<map.cols;x++){var mn=[x,-1,z],mx=[x+1,topY(x,z),z+1],t0=0,t1=Infinity,ok=true;
+    var best=null,bt=Infinity,W=viewWin(),xa=0,xb=map.cols-1,za=0,zb=map.rows-1;
+    if(W){xa=Math.max(0,Math.floor(W.x0));xb=Math.min(map.cols-1,Math.ceil(W.x1));za=Math.max(0,Math.floor(W.z0));zb=Math.min(map.rows-1,Math.ceil(W.z1));}
+    for(var z=za;z<=zb;z++)for(var x=xa;x<=xb;x++){var mn=[x,-1,z],mx=[x+1,topY(x,z),z+1],t0=0,t1=Infinity,ok=true;
       for(var i=0;i<3;i++){if(Math.abs(d[i])<1e-8){if(a[i]<mn[i]||a[i]>mx[i]){ok=false;break;}}else{var u0=(mn[i]-a[i])/d[i],u1=(mx[i]-a[i])/d[i];if(u0>u1){var q=u0;u0=u1;u1=q;}t0=Math.max(t0,u0);t1=Math.min(t1,u1);if(t0>t1){ok=false;break;}}}
       if(ok&&t0<bt){bt=t0;best={x:x,y:z};}}
     return best;}
@@ -3107,7 +3234,7 @@ const B3D = (function(){
   function resetCamera(){
     if(!map||!cv) return;
     cam.tyaw=Math.round(cam.tyaw/(Math.PI*2))*Math.PI*2;cam.tp=S.pitchOblique;
-    flyTo(overviewDist(S.pitchOblique),map.cols/2,map.rows/2);
+    if(ex&&ex.home)flyTo(overviewDist(S.pitchOblique),ex.home.x,ex.home.z);else flyTo(overviewDist(S.pitchOblique),map.cols/2,map.rows/2);
   }
   function toggleTilt(){cam.tp=cam.tp>1.2?S.pitchOblique:S.pitchTop;}
   /* 目標格不在畫面內時，鏡頭平移過去（不改縮放） */
@@ -3135,20 +3262,21 @@ const B3D = (function(){
   function tap(cx,cy){
     var uh=unitAtScreen(cx,cy),t=uh?{x:uh._dx,y:uh._dy}:pickTile(cx,cy);
     if(onTapCb) onTapCb(uh,t);}
-  var ptrs={},nptr=0,down=null;
+  var ptrs={},nptr=0,down=null,holdT=0;
   function bindInput(){
     cv.addEventListener('contextmenu',function(e){e.preventDefault();});
     cv.addEventListener('pointerdown',function(e){fly=null;try{cv.setPointerCapture(e.pointerId);}catch(_){}ptrs[e.pointerId]={x:e.clientX,y:e.clientY};nptr++;
-      down=nptr===1?{x:e.clientX,y:e.clientY,moved:false,btn:e.button,multi:false}:down;if(nptr>1&&down){down.multi=true;down.moved=true;}});
+      down=nptr===1?{x:e.clientX,y:e.clientY,moved:false,btn:e.button,multi:false,hold:false}:down;if(nptr>1&&down){down.multi=true;down.moved=true;}
+      if(ex&&!ex.noHold&&nptr===1&&e.button===0){var dd=down;clearTimeout(holdT);holdT=setTimeout(function(){if(down===dd&&!dd.moved&&!dd.multi&&ex)dd.hold=true;},S.holdMs);}});
     cv.addEventListener('pointermove',function(e){var p=ptrs[e.pointerId];
       if(!p){if(e.pointerType==='mouse')hover(e.clientX,e.clientY);return;}
       var dx=e.clientX-p.x,dy=e.clientY-p.y;
-      if(nptr===1&&down){if(!down.moved&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>S.dragThresholdPx)down.moved=true;
+      if(nptr===1&&down){if(!down.moved&&!down.hold&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>S.dragThresholdPx)down.moved=true;
         if(down.moved){if(down.btn!==0||e.shiftKey)pan(dx,dy);else{cam.yaw-=dx*S.rotateSensYaw;cam.tyaw=cam.yaw;cam.pitch+=dy*S.rotateSensPitch;cam.tp=cam.pitch;clampCam();}}}
       else if(nptr===2){var o=null;for(var id in ptrs){if(+id!==e.pointerId)o=ptrs[id];}
         if(o){var pd=Math.hypot(p.x-o.x,p.y-o.y),nd=Math.hypot(e.clientX-o.x,e.clientY-o.y);if(nd>0)cam.dist*=pd/nd;pan(dx/2,dy/2);clampCam();}}
       p.x=e.clientX;p.y=e.clientY;});
-    function up(e){if(!ptrs[e.pointerId])return;var wasTap=nptr===1&&down&&!down.moved&&!down.multi&&down.btn===0&&e.type==='pointerup';delete ptrs[e.pointerId];nptr=Math.max(0,nptr-1);if(wasTap)tap(e.clientX,e.clientY);if(nptr===0)down=null;}
+    function up(e){if(!ptrs[e.pointerId])return;clearTimeout(holdT);if(down&&down.hold&&onHoldCb)onHoldCb(null,true);var wasTap=nptr===1&&down&&!down.moved&&!down.multi&&!down.hold&&down.btn===0&&e.type==='pointerup';delete ptrs[e.pointerId];nptr=Math.max(0,nptr-1);if(wasTap)tap(e.clientX,e.clientY);if(nptr===0)down=null;}
     cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
     cv.addEventListener('wheel',function(e){fly=null;e.preventDefault();cam.dist*=Math.exp(e.deltaY*S.wheelZoomSens);clampCam();},{passive:false});
   }
@@ -3161,16 +3289,19 @@ const B3D = (function(){
   function syncUnit(u,dt){
     var v=u._v;
     if(!v){v=u._v={x:u._dx+0.5,z:u._dy+0.5,y:topY(u._dx,u._dy),tx:u._dx,ty:u._dy,q:[],seg:null,alpha:1,ox:0};}
-    if(u._dx!==v.tx||u._dy!==v.ty){
+    if(u._blink){u._blink=false;v.q.length=0;v.seg=null;v.x=u._dx+0.5;v.z=u._dy+0.5;v.y=topY(u._dx,u._dy);v.tx=u._dx;v.ty=u._dy;}   // v0.50-b5：瞬間移動直接跳過去
+    if(!u._hold&&(u._dx!==v.tx||u._dy!==v.ty)){   // _hold：開場演出期間先停在原地，等「人物進場」才走
       var path=null;
       if(S.moveAnim&&!u._introHide&&scene.pathFn){try{path=scene.pathFn(u,v.tx,v.ty,u._dx,u._dy);}catch(e){path=null;}}
       if(path&&path.length>1){for(var i=1;i<path.length;i++)v.q.push([path[i][0],path[i][1]]);}
       else if(S.moveAnim&&!u._introHide){v.q.push([u._dx,u._dy]);}
       else{v.q.length=0;v.seg=null;v.x=u._dx+0.5;v.z=u._dy+0.5;v.y=topY(u._dx,u._dy);}
       v.tx=u._dx;v.ty=u._dy;
+      if(u._capWalk){u._capWalk=false;v.sp=Math.max(1,(v.q.length+(v.seg?1:0))*S.moveSecPerTile/S.walkCapSec);}
     }
+    if(!v.seg&&!v.q.length)v.sp=1;
     if(!v.seg&&v.q.length){var n=v.q.shift();v.seg={x0:v.x,z0:v.z,y0:v.y,x1:n[0]+0.5,z1:n[1]+0.5,y1:topY(n[0],n[1]),p:0};}
-    if(v.seg){var s=v.seg;s.p=Math.min(1,s.p+dt/S.moveSecPerTile);v.x=s.x0+(s.x1-s.x0)*s.p;v.z=s.z0+(s.z1-s.z0)*s.p;v.y=s.y0+(s.y1-s.y0)*s.p+Math.sin(Math.PI*s.p)*S.hopHeight;if(s.p>=1){v.seg=null;}}
+    if(v.seg){var s=v.seg;s.p=Math.min(1,s.p+dt*(v.sp||1)/S.moveSecPerTile);v.x=s.x0+(s.x1-s.x0)*s.p;v.z=s.z0+(s.z1-s.z0)*s.p;v.y=s.y0+(s.y1-s.y0)*s.p+Math.sin(Math.PI*s.p)*S.hopHeight;var fxs=(s.x1-s.x0)*camR[0]+(s.z1-s.z0)*camR[2];if(Math.abs(fxs)>0.001)u._faceRight=fxs>0;if(s.p>=1){v.seg=null;}}
     var a=u.hp<=0?0.35:1,ox=0;
     if(u._introHide&&!u._intro) a=0;
     if(u._intro){var it=u._intro,k=(performance.now()-it.t0-it.delay)/it.dur;
@@ -3188,53 +3319,65 @@ const B3D = (function(){
   function quadOvl(a,x,z,c,inset){var y=topY(x,z)+0.016,i=inset||0.03,x0=x+i,x1=x+1-i,z0=z+i,z1=z+1-i;
     a.push(x0,y,z0,c[0],c[1],c[2],c[3],x0,y,z1,c[0],c[1],c[2],c[3],x1,y,z1,c[0],c[1],c[2],c[3],x0,y,z0,c[0],c[1],c[2],c[3],x1,y,z1,c[0],c[1],c[2],c[3],x1,y,z0,c[0],c[1],c[2],c[3]);}
   function drawBatch(tex,arr,mode,cut,depthW){
-    if(!arr.length)return;gl.useProgram(P.bb);gl.uniformMatrix4fv(P.bb.uVP,false,vp);attribs(3);gl.depthMask(depthW);
+    if(!arr.length)return;gl.useProgram(P.bb);gl.uniformMatrix4fv(P.bb.uVP,false,vp);fogSet(P.bb);attribs(3);gl.depthMask(depthW);
     if(mode==='add')gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE,gl.ONE,gl.ONE);else gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
     gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1f(P.bb.uCut,cut);gl.bindBuffer(gl.ARRAY_BUFFER,dynBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(arr),gl.STREAM_DRAW);
     gl.vertexAttribPointer(0,3,gl.FLOAT,false,36,0);gl.vertexAttribPointer(1,2,gl.FLOAT,false,36,12);gl.vertexAttribPointer(2,4,gl.FLOAT,false,36,20);gl.drawArrays(gl.TRIANGLES,0,arr.length/9);}
   function drawMeshArr(arr,depthW){
-    if(!arr.length)return;gl.useProgram(P.mesh);gl.uniformMatrix4fv(P.mesh.uVP,false,vp);attribs(3);gl.depthMask(depthW);gl.bindBuffer(gl.ARRAY_BUFFER,rockBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(arr),gl.STREAM_DRAW);
+    if(!arr.length)return;gl.useProgram(P.mesh);gl.uniformMatrix4fv(P.mesh.uVP,false,vp);fogSet(P.mesh);attribs(3);gl.depthMask(depthW);gl.bindBuffer(gl.ARRAY_BUFFER,rockBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(arr),gl.STREAM_DRAW);
     gl.vertexAttribPointer(0,3,gl.FLOAT,false,40,0);gl.vertexAttribPointer(1,3,gl.FLOAT,false,40,12);gl.vertexAttribPointer(2,4,gl.FLOAT,false,40,24);gl.drawArrays(gl.TRIANGLES,0,arr.length/10);}
   /* 岩壁是否擋住了鏡頭到某單位的視線（線段與岩壁方塊相交） */
   function segHitsBox(a,b,mn,mx){var t0=0,t1=1;for(var i=0;i<3;i++){var d=b[i]-a[i];if(Math.abs(d)<1e-9){if(a[i]<mn[i]||a[i]>mx[i])return false;}else{var u0=(mn[i]-a[i])/d,u1=(mx[i]-a[i])/d;if(u0>u1){var q=u0;u0=u1;u1=q;}t0=Math.max(t0,u0);t1=Math.min(t1,u1);if(t0>t1)return false;}}return true;}
   function updateRocks(dt){
     var pts=[];scene.units.forEach(function(u){if(u.x>=0&&u._v)pts.push([u._v.x,u._v.y+0.7,u._v.z]);});
     var k=Math.min(1,dt*S.wallFadeSpeed);
-    rocks.forEach(function(r){var T=topY(r.x,r.z),hit=false;
+    var W=viewWin();
+    rocks.forEach(function(r){if(W&&(r.x<W.x0||r.x>W.x1||r.z<W.z0||r.z>W.z1))return;var T=topY(r.x,r.z),hit=false;
       for(var i=0;i<pts.length&&!hit;i++){if(Math.abs(pts[i][0]-(r.x+0.5))<0.01&&Math.abs(pts[i][2]-(r.z+0.5))<0.01)continue;hit=segHitsBox(eye,pts[i],[r.x,-1,r.z],[r.x+1,T,r.z+1]);}
       r.ta=hit?S.wallFadeAlpha:1;r.a+=(r.ta-r.a)*k;});}
 
   function draw(){
     gl.viewport(0,0,cv.width,cv.height);gl.depthMask(true);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.disable(gl.BLEND);gl.depthMask(true);
-    gl.useProgram(P.mesh);gl.uniformMatrix4fv(P.mesh.uVP,false,vp);attribs(3);gl.bindBuffer(gl.ARRAY_BUFFER,meshBuf);
-    gl.vertexAttribPointer(0,3,gl.FLOAT,false,40,0);gl.vertexAttribPointer(1,3,gl.FLOAT,false,40,12);gl.vertexAttribPointer(2,4,gl.FLOAT,false,40,24);gl.drawArrays(gl.TRIANGLES,0,meshN);
+    var W=viewWin();
+    function inW(x0,z0,x1,z1){return !W||!(x1<W.x0||x0>W.x1||z1<W.z0||z0>W.z1);}
+    gl.useProgram(P.mesh);gl.uniformMatrix4fv(P.mesh.uVP,false,vp);fogSet(P.mesh);attribs(3);
+    chunks.forEach(function(ch){if(!ch.meshN||!inW(ch.x0,ch.z0,ch.x1,ch.z1))return;gl.bindBuffer(gl.ARRAY_BUFFER,ch.mesh);
+      gl.vertexAttribPointer(0,3,gl.FLOAT,false,40,0);gl.vertexAttribPointer(1,3,gl.FLOAT,false,40,12);gl.vertexAttribPointer(2,4,gl.FLOAT,false,40,24);gl.drawArrays(gl.TRIANGLES,0,ch.meshN);});
     // 岩壁：不透明的先畫、半透明的後畫（不寫深度）
-    var op=[],tr=[];rocks.forEach(function(r){var tgt=r.a>0.98?op:tr;for(var i=0;i<r.geo.length;i+=10){for(var j=0;j<9;j++)tgt.push(r.geo[i+j]);tgt.push(r.a>0.98?1:r.a);}});
+    var op=[],tr=[];rocks.forEach(function(r){if(W&&(r.x<W.x0||r.x>W.x1||r.z<W.z0||r.z>W.z1))return;var tgt=r.a>0.98?op:tr;for(var i=0;i<r.geo.length;i+=10){for(var j=0;j<9;j++)tgt.push(r.geo[i+j]);tgt.push(r.a>0.98?1:r.a);}});
     drawMeshArr(op,true);gl.enable(gl.BLEND);gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);drawMeshArr(tr,false);
     gl.enable(gl.BLEND);gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
-    gl.useProgram(P.ovl);gl.uniformMatrix4fv(P.ovl.uVP,false,vp);attribs(2);gl.bindBuffer(gl.ARRAY_BUFFER,lineBuf);gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0);gl.vertexAttribPointer(1,4,gl.FLOAT,false,28,12);gl.drawArrays(gl.LINES,0,lineN);
+    gl.useProgram(P.ovl);gl.uniformMatrix4fv(P.ovl.uVP,false,vp);fogSet(P.ovl);attribs(2);
+    chunks.forEach(function(ch){if(!ch.lineN||!inW(ch.x0,ch.z0,ch.x1,ch.z1))return;gl.bindBuffer(gl.ARRAY_BUFFER,ch.line);gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0);gl.vertexAttribPointer(1,4,gl.FLOAT,false,28,12);gl.drawArrays(gl.LINES,0,ch.lineN);});
     var o=[],i,x,z;gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(-2,-2);
     var LIM=cam.dist*1.2+8;LIM*=LIM;function near(x,z){var dx=x+0.5-cam.tx,dz=z+0.5-cam.tz;return dx*dx+dz*dz<LIM;}
     for(i=0;i<waterList.length;i++){x=waterList[i][0];z=waterList[i][1];if(near(x,z))quadOvl(o,x,z,[1,1,1,0.07+0.05*Math.sin(tm*2+x*0.9+z*0.6)],0);}
     for(i=0;i<poisonList.length;i++){x=poisonList[i][0];z=poisonList[i][1];if(near(x,z))quadOvl(o,x,z,[0.75,0.3,0.95,0.26+0.12*Math.sin(tm*2.5+x+z)],0);}
     for(i=0;i<scene.effects.length;i++){var ef=scene.effects[i];if(ef.type==='fire')quadOvl(o,ef.x,ef.y,[1,0.45,0.1,0.36+0.14*Math.sin(tm*5+i*2)],0);}
     for(i=0;i<scene.floorItems.length;i++)quadOvl(o,scene.floorItems[i].x,scene.floorItems[i].y,[1,0.85,0.3,0.14],0.1);
+    for(i=0;i<scene.rects.length;i++){var rc=scene.rects[i],rx0=rc.x,rx1=rc.x+rc.w-1,rz0=rc.y,rz1=rc.y+rc.h-1;
+      if(W){rx0=Math.max(rx0,Math.floor(W.x0));rx1=Math.min(rx1,Math.ceil(W.x1));rz0=Math.max(rz0,Math.floor(W.z0));rz1=Math.min(rz1,Math.ceil(W.z1));}
+      for(z=rz0;z<=rz1;z++)for(x=rx0;x<=rx1;x++)quadOvl(o,x,z,rc.c,0.04);}
     for(i=0;i<scene.yellow.length;i++)quadOvl(o,scene.yellow[i][0],scene.yellow[i][1],S.colYellow,0.05);
+    for(i=0;i<scene.move.length;i++)quadOvl(o,scene.move[i][0],scene.move[i][1],S.colMove,0.05);
     for(i=0;i<scene.red.length;i++)quadOvl(o,scene.red[i][0],scene.red[i][1],S.colRed,0.05);
-    if(hoverPath&&hoverPath.length)for(i=0;i<hoverPath.length;i++)quadOvl(o,hoverPath[i][0],hoverPath[i][1],S.colPath,0.14);
+    // v0.50-a4：探索模式由 scene.routeFn(hoverTile) 每幀決定要畫哪條路線（走過的格子即消失）；戰鬥沒設 routeFn，維持原本的懸停路徑
+    var rp=scene.routeFn?scene.routeFn(hoverTile):hoverPath,rcol=scene.routeCol||S.colPath;
+    if(rp&&rp.length)for(i=0;i<rp.length;i++)quadOvl(o,rp[i][0],rp[i][1],rcol,0.14);
     var act=scene.actor;if(act&&act.x>=0)quadOvl(o,act._dx,act._dy,[S.colActor[0],S.colActor[1],S.colActor[2],S.colActor[3]+0.15*Math.sin(tm*5)],0.02);
     if(o.length){gl.bindBuffer(gl.ARRAY_BUFFER,dynBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(o),gl.STREAM_DRAW);gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0);gl.vertexAttribPointer(1,4,gl.FLOAT,false,28,12);gl.drawArrays(gl.TRIANGLES,0,o.length/7);}
     gl.disable(gl.POLYGON_OFFSET_FILL);
     var shA=[],flA=[],bbA=[],stA=[],lf=tiltA*0.6,usc=1+tiltA*0.6;
-    scene.units.forEach(function(u){if(u.x<0||!u._v)return;var v=u._v;pushV(shA,flatV(v.x+v.ox*camR[0],topY(u._dx,u._dy)+0.02,v.z+v.ox*camR[2],0.5),[1,1,1,0.6*v.alpha]);});
+    function uVis(u){if(!ex)return true;var v=u._v;return Math.abs(v.x-cam.tx)<=ex.radius+1&&Math.abs(v.z-cam.tz)<=ex.radius+1;}
+    scene.units.forEach(function(u){if(u.x<0||!u._v||!uVis(u))return;var v=u._v;pushV(shA,flatV(v.x+v.ox*camR[0],topY(u._dx,u._dy)+0.02,v.z+v.ox*camR[2],0.5),[1,1,1,0.6*v.alpha]);});
     for(i=0;i<scene.effects.length;i++){var f=scene.effects[i];if(f.type!=='fire')continue;var T=topY(f.x,f.y);for(var j=0;j<3;j++){var fx0=f.x+0.25+0.5*hash(f.x,f.y,40+j),fz0=f.y+0.25+0.5*hash(f.x,f.y,50+j),hh=0.75+0.3*Math.sin(tm*7+j*2.1+i),ww=0.5+0.1*Math.sin(tm*9+j);pushV(flA,bbV(fx0,T+lf,fz0,ww,hh),[1,1,1,0.9]);}}
     for(i=0;i<poisonList.length;i++){x=poisonList[i][0];z=poisonList[i][1];if(!near(x,z))continue;var Tp=topY(x,z);for(var q=0;q<3;q++){var ph=(tm*0.35+q/3+hash(x,z,60+q))%1,bx=x+0.2+0.6*hash(x,z,70+q),bz=z+0.2+0.6*hash(x,z,80+q);pushV(bbA,bbV(bx,Tp+ph*0.8+lf,bz,0.16,0.16),[0.85,0.55,1,0.7*(1-ph)]);}}
     for(i=0;i<scene.floorItems.length;i++){var it=scene.floorItems[i];pushV(stA,bbV(it.x+0.5,topY(it.x,it.y)+0.25+0.08*Math.sin(tm*3+i)+lf,it.y+0.5,0.42,0.42),[1,1,1,1]);}
     drawBatch(TX.blob,shA,'n',0.01,false);
     if(tiltA>0.6)gl.disable(gl.DEPTH_TEST);
     drawBatch(TX.star,stA,'n',0.2,false);
-    var order=scene.units.filter(function(u){return u.x>=0&&u._v;}).sort(function(a,b){var da=(a._v.x-cam.tx)*Math.sin(cam.yaw)+(a._v.z-cam.tz)*Math.cos(cam.yaw),db=(b._v.x-cam.tx)*Math.sin(cam.yaw)+(b._v.z-cam.tz)*Math.cos(cam.yaw);return db-da;});
+    var order=scene.units.filter(function(u){return u.x>=0&&u._v&&uVis(u);}).sort(function(a,b){var da=(a._v.x-cam.tx)*Math.sin(cam.yaw)+(a._v.z-cam.tz)*Math.cos(cam.yaw),db=(b._v.x-cam.tx)*Math.sin(cam.yaw)+(b._v.z-cam.tz)*Math.cos(cam.yaw);return db-da;});
     var redSet=new Set(scene.redUnits);
     order.forEach(function(u){
       var v=u._v;if(v.alpha<=0.01)return;
@@ -3243,7 +3386,9 @@ const B3D = (function(){
       if(!e)e=badge(u);else u._lastSpr=e;
       u._spr=e;
       var sz=spriteSize(u),tint=redSet.has(u)?[1,0.72+0.12*Math.sin(tm*6),0.68,v.alpha]:[1,1,1,v.alpha],ua=[];
-      pushV(ua,bbV(v.x+v.ox*camR[0],v.y+lf,v.z+v.ox*camR[2],sz.w*usc,sz.h*usc),tint);
+      var bv=bbV(v.x+v.ox*camR[0],v.y+lf,v.z+v.ox*camR[2],sz.w*usc,sz.h*usc);
+      if(ex&&ex.flip!=='none'&&u._faceRight!==undefined&&((ex.flip==='artFacesRight'&&!u._faceRight)||(ex.flip==='artFacesLeft'&&u._faceRight))){for(var fq=3;fq<bv.length;fq+=5)bv[fq]=1-bv[fq];}
+      pushV(ua,bv,tint);
       drawBatch(e.tex,ua,'n',v.alpha<0.99?0.02:0.4,v.alpha>=0.99);});
     gl.enable(gl.DEPTH_TEST);
     drawBatch(TX.flame,flA,'add',0.01,false);drawBatch(TX.circle,bbA,'n',0.01,false);
@@ -3269,9 +3414,11 @@ const B3D = (function(){
     if(!running){rafId=0;return;}
     rafId=requestAnimationFrame(frame);
     var raw=(ts-lastT)/1000||0.016,dt=Math.min(0.1,raw);lastT=ts;tm=ts/1000;fpsAvg=fpsAvg*0.93+(1/Math.max(0.001,raw))*0.07;
-    if(!glOK||!map||!meshBuf||!cv.clientWidth||!cv.clientHeight) return;
+    if(!glOK||!map||!chunks.length||!cv.clientWidth||!cv.clientHeight) return;
     resize();
     scene.units.forEach(function(u){if(u.x>=0&&u._dx!==undefined)syncUnit(u,dt);});
+    if(down&&down.hold&&onHoldCb){var hp=null;for(var hid in ptrs){hp=ptrs[hid];break;}if(hp)onHoldCb(pickTile(hp.x,hp.y),false);}
+    if(ex&&ex.follow&&ex.follow._v){var fv=ex.follow._v,kf=Math.min(1,dt*ex.followK);cam.tx+=(fv.x-cam.tx)*kf;cam.tz+=(fv.z-cam.tz)*kf;cam.ty+=(fv.y*0.6+0.3-cam.ty)*kf;fly=null;}
     updateCam(dt);updateRocks(dt);draw();positionTags();
   }
   function run(){if(running)return;running=true;lastT=performance.now();rafId=requestAnimationFrame(frame);}
@@ -3281,12 +3428,24 @@ const B3D = (function(){
   return {
     get ok(){return glOK;},
     mount:function(host){ensureDom();host.appendChild(wrap);ov.innerHTML='';tags.clear();return glOK;},
-    loadMap:function(m){map=m;mapVer++;ensureDom();if(glOK)buildMesh();hoverTile=null;hoverPath=null;
+    loadMap:function(m){ex=null;map=m;mapVer++;ensureDom();if(glOK)buildMesh();hoverTile=null;hoverPath=null;
       cam.yaw=cam.tyaw=0;cam.pitch=cam.tp=S.pitchOblique;cam.tx=m.cols/2;cam.tz=m.rows/2;cam.ty=0.5;fly=null;
       if(cv&&cv.clientWidth)cam.dist=overviewDist(S.pitchOblique);else cam.dist=Math.max(m.cols,m.rows)*1.85;},
-    unloadMap:function(){freeMap();map=null;rocks=[];tags.clear();if(ov)ov.innerHTML='';scene.units=[];},
+    curMap:function(){return map;},
+    get camState(){return cam;},   // 測試用：讀取鏡頭狀態
+    setExplore:function(o){ex=o?{radius:o.radius||12,dim:o.dim!=null?o.dim:6,dark:o.dark!=null?o.dark:0.72,out:o.out!=null?o.out:3,maxDist:o.maxDist||34,follow:o.follow||null,followK:o.followK||6,flip:o.flip||'none',fit:o.fit||0,home:o.home||null,noHold:!!o.noHold}:null;},
+    /* v0.50-b2：在探索用的同一張大地圖上就地開戰——不重建地圖網格，只重設滑鼠狀態；fitHome 把鏡頭對準戰鬥範圍 */
+    reuseMap:function(){hoverTile=null;hoverPath=null;fly=null;},
+    fitHome:function(){var h=ex&&ex.home;if(!h)return;cam.tx=h.x;cam.tz=h.z;cam.dist=overviewDist(cam.tp);fly=null;},
+    /* v0.50-b6：鏡頭平移到戰鬥範圍中心（x,z＝格座標中心，fit＝戰鬥範圍較長邊，ms＝花多久）；平移期間不再跟隨隊長 */
+    panTo:function(x,z,fit,ms){if(!map)return;var sf=null;if(ex){ex.follow=null;ex.maxDist=Math.max(ex.maxDist,60);sf=ex.fit;ex.fit=fit;}var d=overviewDist(cam.tp);if(ex)ex.fit=sf;flyTo(d,x,z);fly.dur=Math.max(0.05,ms/1000);},
+    /* v0.50-b7：戰後鏡頭從目前位置（戰場）平順飛回隊長，飛完才恢復跟隨 */
+    returnTo:function(x,z,d,ms,follow){if(!map)return;if(ex){ex.follow=null;}flyTo(d,x+0.5,z+0.5);fly.dur=Math.max(0.05,ms/1000);fly.after=follow||null;},
+    focus:function(x,z,d){cam.tx=x+0.5;cam.tz=z+0.5;if(d)cam.dist=d;fly=null;},
+    unloadMap:function(){ex=null;freeMap();map=null;rocks=[];tags.clear();if(ov)ov.innerHTML='';scene.units=[];},
     setScene:function(s){Object.assign(scene,s);},
     onTap:function(fn){onTapCb=fn;},
+    onHold:function(fn){onHoldCb=fn;},
     setTags:function(list){ // list:[{u,html,cls}]
       var keep=new Set();
       list.forEach(function(it){keep.add(it.u.id);var t=tags.get(it.u.id);
@@ -3297,8 +3456,9 @@ const B3D = (function(){
       units.forEach(function(u){var i=cnt[u.side==='ally'?'ally':'enemy']++;u._introHide=true;u._intro={t0:now,delay:i*staggerMs,dur:durMs,dir:u.side==='ally'?-1:1};});},
     hideUnits:function(units){units.forEach(function(u){u._introHide=true;u._intro=null;});},
     clearIntro:function(units){units.forEach(function(u){u._introHide=false;u._intro=null;});},
+    unitsIdle:function(us){return us.every(function(u){var v=u._v;return !v||u._hold||(!v.seg&&!v.q.length&&u._dx===v.tx&&u._dy===v.ty);});},
     ensureVisible:ensureVisible, resetCamera:resetCamera, run:run, pause:pause,
-    dbg:{cam:cam,project:project,pickTile:pickTile,unitAtScreen:unitAtScreen,tap:tap,fps:function(){return fpsAvg;},stats:function(){return{meshN:meshN,rocks:rocks.length,tags:tags.size,glOK:glOK,running:running};},rocks:function(){return rocks.map(function(r){return[r.x,r.z,+r.a.toFixed(2)];});},texStates:function(){var o={};texCache.forEach(function(e,k){o[k]=e.state;});return o;}},
+    dbg:{cam:cam,project:project,pickTile:pickTile,unitAtScreen:unitAtScreen,tap:tap,fps:function(){return fpsAvg;},stats:function(){var n=0;chunks.forEach(function(c){n+=c.meshN;});return{meshN:n,chunks:chunks.length,rocks:rocks.length,tags:tags.size,glOK:glOK,running:running};},rocks:function(){return rocks.map(function(r){return[r.x,r.z,+r.a.toFixed(2)];});},texStates:function(){var o={};texCache.forEach(function(e,k){o[k]=e.state;});return o;}},
   };
 })();
 
@@ -3359,7 +3519,14 @@ function renderBattle(){
   // v0.48：掛上3D戰場（canvas只建一次、每場戰鬥重新掛回來；地圖網格每場重建）
   B3D.mount(document.getElementById('stageHost'));
   if(!B3D.ok) toast('此裝置不支援WebGL，無法顯示3D戰場');
-  B3D.loadMap(battle.map);
+  if(battle.arena){
+    // v0.50-b2：就地開戰——沿用探索的同一張大地圖（不重建），清楚視野＝戰鬥範圍外接圓＋1格，外面是黑霧，鏡頭對準範圍中心
+    const a = battle.arena;
+    if(B3D.curMap() !== battle.map) B3D.loadMap(battle.map); else B3D.reuseMap();
+    B3D.setExplore({ radius:Math.hypot(a.w/2, a.h/2)+1, dim:4, dark:EXPLORE_DIM_DARK, out:2, maxDist:60, follow:null, flip:EXPLORE_WALK_FLIP, fit:Math.max(a.w,a.h), noHold:true, home:{ x:a.x+a.w/2, z:a.y+a.h/2 } });
+    B3D.fitHome();
+  } else B3D.loadMap(battle.map);
+  B3D.onHold(null);
   B3D.onTap(stageTap);
   B3D.run();
   battle._focusActor = null;
@@ -3482,16 +3649,33 @@ function stageHoverPath(x, y){
   if(!(r.dist[k] > 0 && r.dist[k] < Infinity) || !reachCanStop(r,x,y)) return null;
   return pathFromPrev(r, x, y).slice(1);
 }
+/* 戰鬥範圍外圍一圈（STAGE_FLEE_BAND 格寬）標成橘色＝逃跑格提示 */
+const STAGE_FLEE_BAND = 4;
+const STAGE_FLEE_COLOR = [0.98, 0.50, 0.12, 0.34];
+function fleeBandRects(){
+  const a = battle && battle.arena; if(!a) return [];
+  const m = battle.map, B = STAGE_FLEE_BAND, out = [];
+  const add = (x0,y0,x1,y1)=>{ x0=Math.max(0,x0); y0=Math.max(0,y0); x1=Math.min(m.cols,x1); y1=Math.min(m.rows,y1); if(x1>x0 && y1>y0) out.push({ x:x0, y:y0, w:x1-x0, h:y1-y0, c:STAGE_FLEE_COLOR }); };
+  add(a.x-B, a.y-B, a.x+a.w+B, a.y);               // 上
+  add(a.x-B, a.y+a.h, a.x+a.w+B, a.y+a.h+B);       // 下
+  add(a.x-B, a.y, a.x, a.y+a.h);                   // 左
+  add(a.x+a.w, a.y, a.x+a.w+B, a.y+a.h);           // 右
+  return out;
+}
 function stageTap(unit, tile){
   if(!battle || battle.finished || battle.introPlaying || battle.actionPanelOpen) return; // 行動面板開著時戰場鎖定（同舊版）
-  const u = unit || (tile ? unitAt(tile.x, tile.y) : null);
+  let u = unit || (tile ? unitAt(tile.x, tile.y) : null);
+  // v0.49修正：移動預覽中，行動者的小圖畫在預覽格，但actor.x/y還是「原本位置」。
+  // 點原本位置時unitAt()會找到行動者自己 → 跳出單位資訊，導致走不回去。這裡改成：預覽中且點的不是預覽格 → 當成點空格（可走回原位）。
+  if(u && u === currentActor() && battle.movePreview && battle.selected.mode === 'move' && tile
+     && !(tile.x === battle.movePreview.x && tile.y === battle.movePreview.y)) u = null;
   if(u) onUnitClick(u);
   else if(tile) onCellClick(tile.x, tile.y);
 }
 function tileInfoText(x, y){
   const t = mapTerrain(battle.map, x, y), h = mapHeight(battle.map, x, y);
   const ef = battle.effects[x+','+y];
-  return `(${x},${y}) ${t.name}・高度${h}級・` + (t.passable ? `移動消耗${t.cost}` : '無法通行') + (t.hazardDmg ? `・回合結束-${t.hazardDmg}HP` : '') + (ef && ef.type==='fire' ? `・火場(剩${ef.turns}回合,-${FIRE_DMG}HP)` : '');
+  return `(${x},${y}) ${t.name}・高度${h}級・` + (t.passable ? `移動消耗${t.cost}` : '無法通行') + (t.hazardDmg ? `・回合結束-${t.hazardDmg}HP` : '') + (ef && ef.type==='fire' ? `・火場(剩${ef.turns}回合,-${FIRE_DMG}HP)` : '') + (battle.arena && !battleInArena(x,y) ? '・逃跑格（確認移動到這裡＝全隊撤離）' : '');
 }
 
 /* v0.48：測試模式專用的不變式檢查（每次畫面同步時跑）：單位必須在地圖內、站在可站地形上、不能兩個單位同格、數值必須是有限數字。
@@ -3512,14 +3696,14 @@ function checkInvariants(){
 function renderGrid(){
   syncSelectionTip(); // v0.47：右上角技能/道具提示小卡（選取狀態一變就會經過這裡）
   renderUnitInspector(); // v0.33：面板開著時才會真的重繪(函式內部已有guard)
-  if(!battle || !battle.map) return;
+  if(!battle || !battle.map || battle.left) return;   // v0.50-b5a：已離開戰場（逃跑確認後 doFlee 之後還會呼叫 renderGrid），不可再把戰鬥單位畫回探索畫面
   if(battle.test) checkInvariants();
   const actor = currentActor();
   const sel = battle.selected;
-  let yellow = [], red = [];
+  let yellow = [], red = [], move = [];
 
   if(sel.mode === 'move'){
-    yellow = computeValidCells(); // 可移動格（黃）
+    move = computeValidCells(); // 可移動格（v0.49起改水藍，技能範圍仍是黃）
   } else if(sel.mode === 'skill' && sel.skillDef){
     // 【施放預覽】規則見 dev4_design_todo.md 第十節：
     // shape===1／self：reach範圍標黃，目標單位標紅；shape==='all'：全場標黃，目標單位標紅；
@@ -3575,10 +3759,10 @@ function renderGrid(){
   });
 
   B3D.setScene({
-    units: allUnits(), actor, yellow, red, redUnits: redTargetUnits,
+    units: allUnits(), actor, rects: fleeBandRects(), yellow, move, red, redUnits: redTargetUnits,
     floorItems: Object.keys(battle.floorItems || {}).map(k=>{ const [x,y] = k.split(',').map(Number); return {x,y,item:battle.floorItems[k]}; }),
     effects: Object.keys(battle.effects || {}).map(k=>{ const [x,y] = k.split(',').map(Number); return {x,y,type:battle.effects[k].type,turns:battle.effects[k].turns}; }),
-    hoverPathFn: stageHoverPath, spriteSrc: stageSpriteSrc, onBadSprite: idleMarkBad, pathFn: stageVisualPath,
+    hoverPathFn: stageHoverPath, routeFn: null, routeCol: null, spriteSrc: stageSpriteSrc, onBadSprite: idleMarkBad, pathFn: stageVisualPath,
   });
   B3D.setTags(tagList);
   // 黃色殘影：雙重requestAnimationFrame，確保瀏覽器先畫出「舊寬度」那一幀，下一幀才改成新寬度觸發CSS transition
@@ -3604,11 +3788,18 @@ function battleOccupancy(exclude){
   });
   return m;
 }
+/* v0.50-b2：就地戰鬥（battle.arena＝戰鬥範圍矩形）。敵方不能走出範圍；我方走到範圍外＝逃跑格（見 onCellClick）。
+   自動測試的我方AI也當成不能出範圍，免得測試中途「逃跑」。 */
+function battleInArena(x,y){ const a = battle && battle.arena; return !a || (x>=a.x && x<a.x+a.w && y>=a.y && y<a.y+a.h); }
+function battleStep(map, mt, u, ax,ay, bx,by){   // 從(ax,ay)走到相鄰的(bx,by)
+  if(battle.arena && !battleInArena(bx,by) && (u.side === 'enemy' || battle.auto)) return Infinity;
+  return mapStepCost(map, mt, ax,ay, bx,by);
+}
 function unitReach(u, sx, sy, pts, relaxed){
   const map = battle.map, occ = battleOccupancy(u), mt = moveTypeOf(u);
   const r = mapDijkstra(map, [[sx,sy,0]], {
     maxCost: pts,
-    step: (ax,ay,bx,by)=> mapStepCost(map, mt, ax,ay,bx,by),
+    step: (ax,ay,bx,by)=> battleStep(map, mt, u, ax,ay,bx,by),
     pass: (x,y)=>{ if(relaxed) return true; const o = occ.get(y*map.cols+x); return !(o && o.side !== u.side); },
   });
   r.occ = occ; r.u = u;
@@ -3622,7 +3813,7 @@ function reachCanStop(r, x, y){
 function distFieldToOpponents(actor){
   const map = battle.map, mt = moveTypeOf(actor);
   const starts = allUnits().filter(o=> o.side !== actor.side && o.hp > 0 && o.x >= 0).map(o=>[o.x,o.y,0]);
-  return mapDijkstra(map, starts, { step:(ax,ay,bx,by)=> mapStepCost(map, mt, bx,by,ax,ay) }).dist;
+  return mapDijkstra(map, starts, { step:(ax,ay,bx,by)=> battleStep(map, mt, actor, bx,by,ax,ay) }).dist;
 }
 function tileHazardDmg(x, y){
   let d = mapTerrain(battle.map,x,y).hazardDmg || 0;
@@ -3676,7 +3867,7 @@ function computeSkillHighlights(actor, d, sel){
   const red = [];
   if(!d) return { yellow, red };
   if(d.shape === 'all'){
-    for(let y=0;y<BOARD_ROWS;y++) for(let x=0;x<BOARD_COLS;x++) yellow.push([x,y]);
+    { const A = battle.arena || {x:0,y:0,w:BOARD_COLS,h:BOARD_ROWS}; for(let y=A.y;y<A.y+A.h;y++) for(let x=A.x;x<A.x+A.w;x++) yellow.push([x,y]); }
   } else if(d.shape === 'laser'){
     LASER_DIRECTIONS.forEach(dir=>{
       const area = laserArea(actor, dir.dx, dir.dy, d.reach);
@@ -3688,12 +3879,44 @@ function computeSkillHighlights(actor, d, sel){
     if(sel.anchor){
       squareArea(sel.anchor[0], sel.anchor[1], d.shape).forEach(([x,y])=> red.push([x,y]));
     }
+  } else if(d.shape === 'teleport'){
+    teleportCells(actor, d).forEach(([x,y])=> yellow.push([x,y]));
   } else if(d.shape === 1){
     anchorCellCandidates(actor, d).forEach(([x,y])=> yellow.push([x,y]));
   }
   return { yellow, red };
 }
 
+/* v0.50-b5：閃光遷躍可落腳的格子（射程內、能站、沒人；包含戰鬥範圍外的逃跑格） */
+function teleportCells(actor, d){
+  const out = [], m = battle.map, occ = new Set(allUnits().filter(u=>u.hp>0 && u!==actor).map(u=>u.x+','+u.y));
+  for(let y=Math.max(0,actor.y-d.reach); y<=Math.min(m.rows-1,actor.y+d.reach); y++)
+    for(let x=Math.max(0,actor.x-d.reach); x<=Math.min(m.cols-1,actor.x+d.reach); x++){
+      if(x===actor.x && y===actor.y) continue;
+      if(!mapTerrain(m,x,y).passable || occ.has(x+','+y)) continue;
+      out.push([x,y]);
+    }
+  return out;
+}
+function doTeleport(actor, key, d, x, y){
+  const cost = (d.cost && d.cost.res) || 0;
+  if(actor.resName !== '-'){ if(actor.res < cost){ toast(actor.resName+'不足'); return; } actor.res = clamp(actor.res - cost, 0, actor.resMax); }
+  bubble(actor, d.lines[Math.floor(Math.random()*d.lines.length)]);
+  try{ showCastBanner(actor, d.name, skillSummaryText(d)); }catch(e){}
+  actor.cooldowns[key] = d.cd; actor.skillUsed = true;
+  actor.x = x; actor.y = y; actor._blink = true;
+  battle.selected = { mode:null };
+  if(battle.arena && actor.side === 'ally' && !battleInArena(x,y) && !battle.fleeing){
+    battle.fleeing = true;
+    logMsg(`<b>${actor.name}</b> 以「${d.name}」躍出了戰鬥範圍，全隊撤離。`);
+    renderGrid(); renderLog(false);
+    setTimeout(()=>{ if(battle && !battle.finished) doFlee(); }, 400);
+    return;
+  }
+  logMsg(`<b>${actor.name}</b> 使用「${d.name}」，瞬間移動到 (${x},${y})。`);
+  renderGrid(); renderLog(false);
+  setTimeout(()=> afterAction(actor), 250);
+}
 function unitAt(x,y){
   return allUnits().find(u=> u.x===x && u.y===y && u.hp>0 !== false ? (u.x===x&&u.y===y) : false) || allUnits().find(u=>u.x===x&&u.y===y);
 }
@@ -3853,6 +4076,13 @@ function commitMovePreview(){
   actor.x = x; actor.y = y;
   actor.movePts = Math.max(0, actor.movePts - dist);
   battle.movePreview = null;
+  if(moved && battle.arena && actor.side === 'ally' && !battleInArena(x,y) && !battle.fleeing){
+    // v0.50-b3：確認移動到逃跑格＝全隊撤離。只看玩家自己確認的移動（日後的推撞／擊退不走這裡，不會觸發逃跑）
+    battle.fleeing = true;
+    logMsg(`<b>${actor.name}</b> 衝出了戰鬥範圍，全隊撤離。`);
+    setTimeout(()=>{ if(battle && !battle.finished) doFlee(); }, 0);
+    return;
+  }
   if(moved) logMsg(`<b>${actor.name}</b> 移動了位置。`); // dist===0代表悔棋悔回原地，等於沒動，不留紀錄
 }
 
@@ -3862,6 +4092,7 @@ function onCellClick(x,y){
   if(sel.mode === 'move'){
     const valid = computeValidCells().some(([vx,vy])=>vx===x&&vy===y);
     if(!valid) return;
+    // v0.50-b3：範圍外的逃跑格不再跳詢問框——跟一般移動一樣只是預覽（可悔棋），右上角提示卡警告；確認移動（選行動／結束回合）的當下才撤離，見 commitMovePreview
     // v0.42修正：改成「悔棋」——點格子只是更新預覽位置(battle.movePreview)，不會馬上扣movePts、
     // 也不會結束移動模式，玩家可以一直換選(合法範圍固定用actor真正的起點+全額movePts去算，
     // 不會因為預覽到別的格子就跟著縮小，見computeValidCells())。
@@ -3889,6 +4120,17 @@ function onCellClick(x,y){
     }
     battle.selected = { ...sel, anchor:[x,y] };
     renderSidePanel(); renderGrid();
+  } else if(sel.mode === 'skill' && sel.skillDef && sel.skillDef.shape === 'teleport'){
+    // v0.50-b5：閃光遷躍——點黃格；落在戰鬥範圍外的逃跑格要點兩次同一格才會跳
+    if(actor.skillUsed){ toast('本回合的技能名額已經用掉了'); return; }
+    const d = sel.skillDef;
+    if(!teleportCells(actor, d).some(([tx,ty])=> tx===x && ty===y)){ toast('這格不能瞬移過去（超出距離、無法站立或已有人）'); return; }
+    if(battle.arena && !battleInArena(x,y) && !(sel.confirmTile && sel.confirmTile[0]===x && sel.confirmTile[1]===y)){
+      battle.selected = { ...sel, confirmTile:[x,y] };
+      toast('這是逃跑格：再點一次同一格＝確認瞬移並撤離');
+      return;
+    }
+    doTeleport(actor, sel.skillKey, d, x, y);
   } else if(sel.mode === 'skill' && sel.skillDef && sel.skillDef.shape === 'laser'){
     // 【laser點格子版】點任一格 → 反推屬於哪個方向 → 直接朝那個方向發動，命中該方向laserTargets算出的全部目標
     if(actor.skillUsed){ toast('本回合的技能名額已經用掉了'); return; }
@@ -3920,6 +4162,7 @@ function onUnitClick(target){
       onCellClick(target.x, target.y);
       return;
     }
+    if(d.shape === 'teleport'){ onCellClick(target.x, target.y); return; }   // v0.50-b5
     // laser：點單位跟點該單位所在的格子是同一件事，直接轉給onCellClick統一處理方向反推邏輯
     if(d.shape === 'laser'){
       onCellClick(target.x, target.y);
@@ -4071,7 +4314,7 @@ function playBattleTransition(onCovered){
 
 // 找目前畫面上真正顯示中的那個view容器(chapters/prep/codex/battle四選一)，剝落效果只複製這一塊，不含nav列
 function getActiveViewEl(){
-  return ['viewChapters','viewPrep','viewCodex','viewBattle']
+  return ['viewChapters','viewPrep','viewCodex','viewExplore','viewBattle']
     .map(id=> document.getElementById(id))
     .find(el=> el && el.style.display !== 'none');
 }
@@ -5067,10 +5310,10 @@ function endBattleReturnToPrep(msg){
   const overlay = document.createElement('div');
   overlay.className = 'battle-result-overlay';
   overlay.innerHTML = `<div class="result-banner">${msg}</div>
-    <button class="btn primary" id="btnBackPrep">返回準備畫面</button>`;
+    <button class="btn primary" id="btnBackPrep">${battleReturnLabel(false)}</button>`;
   el.appendChild(overlay);
   // v0.44新增：離場轉場——勝利/戰敗/脫逃都共用這個「返回準備畫面」按鈕，蓋滿畫面才真正切回準備畫面
-  document.getElementById('btnBackPrep').onclick = ()=> playBattleTransition(()=> switchView('prep'));
+  document.getElementById('btnBackPrep').onclick = ()=> playBattleTransition(()=> battleLeave());
 }
 
 /* v0.35新增：行動面板（左下角icon）overlay開關。
@@ -5105,6 +5348,27 @@ function syncActionModal(){
 // v0.35：戰報改成右下角icon觸發的overlay（見logModal），不再有「展開/收合預覽6則」的分別，
 // 開啟時一律顯示完整紀錄（上限100則，超出用modal-box自帶的滾動）。renderLog()本身仍會在每次
 // 戰報有更新時被呼叫（不論modal是否開著），確保重新打開時內容已經是最新的。
+/* v0.49：戰鬥快捷鍵（PC用）——Z=行動面板、X=戰報(訊息)、C=單位狀態(資料)、V=全部關閉。
+   想改按鍵只要改下面 BATTLE_HOTKEYS 的字母（小寫）。Q/E 是鏡頭轉向，已被占用請避開。
+   只在戰鬥畫面且沒有在輸入文字時生效；開場演出/戰鬥結束期間不動作。 */
+const BATTLE_HOTKEYS = { action:'z', log:'x', status:'c', closeAll:'v' };
+function battleHotkeyHandler(e){
+  if(!battle || battle.finished || battle.introPlaying) return;
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target; if(t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.isContentEditable)) return;
+  const k = (e.key||'').toLowerCase();
+  const logM = document.getElementById('logModal'), stM = document.getElementById('unitInspectorModal');
+  if(k === BATTLE_HOTKEYS.action){ toggleActionPanel(); e.preventDefault(); }
+  else if(k === BATTLE_HOTKEYS.log){ toggleLog(); e.preventDefault(); }
+  else if(k === BATTLE_HOTKEYS.status){ toggleUnitInspector(); e.preventDefault(); }
+  else if(k === BATTLE_HOTKEYS.closeAll){
+    if(battle.actionPanelOpen){ battle.actionPanelOpen = false; syncActionModal(); }
+    if(logM && logM.classList.contains('show')) toggleLog();
+    if(stM && stM.classList.contains('show')) toggleUnitInspector();
+    e.preventDefault();
+  }
+}
+window.addEventListener('keydown', battleHotkeyHandler);
 function toggleLog(){
   const modal = document.getElementById('logModal');
   if(!modal) return;
@@ -5141,6 +5405,7 @@ const BATTLE_INTRO = {
   revealMs: 800,         // 3. 標題與黑幕一起退去
   unitsInMs: 900,        // 4. 人物進場（單位一個接一個滑入，間隔見下）
   unitStaggerMs: 120,    //    單位之間的進場間隔
+  dimAlpha: 0.25,        // v0.50-b3：探索觸發的小型戰鬥（重要度<5）開場只蓋這個透明度的黑（0~1）
   commenceMs: 900,       // 5. "COMMENCE" 停留
   // ── introStyle:'boss' 的戰場（例如毀滅者）專用：標題出現後 → 金色紋路浮現 → 停留 → 標題與紋路擊碎（取代一般戰的淡出）──
   bossOrnamentMs: 1100,  //    金色紋路浮現（描邊畫出來）的時間
@@ -5158,7 +5423,7 @@ const OUTRO = {
 };
 const FIRST_CLEAR_ALWAYS_FOR_TEST = true; // ⚠️ 測試期間true；正式版改false，才會「只有第一次勝利」才給首勝額外獎勵
 const ESCAPE_FX_ENABLED = false;          // 測試用脫逃：false=按下直接回準備畫面、沒有任何特效；正式版改true接回原本脫逃流程
-const SFX_FILES = { victory:null, defeat:null, commence:null, title:null, tick:null, turnAlly:null, turnEnemy:null, shatter:null }; // null=用程式合成的暫時音效；填 'assets/sfx/xxx.mp3' 就改用檔案
+const SFX_FILES = { victory:null, defeat:null, commence:null, title:null, tick:null, turnAlly:null, turnEnemy:null, shatter:null, step:null, stepB:null, alert:null }; // null=用程式合成的暫時音效；填 'assets/sfx/xxx.mp3' 就改用檔案
 const CAST_BANNER_MS = 1400;              // 技能發動提示總長（要同步改CSS castBannerAnim的1.4s）
 const MINI_LOG = { enabled:true, showMs:1000, fadeMs:350, staggerMs:500, maxLines:3 };
 /* 迷你戰報：每次logMsg()都會丟一份進來排隊，一筆一筆依序跳出(間隔staggerMs)，各自顯示showMs後淡出，
@@ -5198,11 +5463,17 @@ const SYNTH_SFX = {
   turnAlly:  [ {f:1568,t:0,d:.55,type:'sine',v:.14},{f:3136,t:0,d:.28,type:'sine',v:.04} ],
   shatter:   [ {f:2600,t:0,d:.07,type:'square',v:.06},{f:1900,t:.02,d:.09,type:'square',v:.06},{f:3200,t:.04,d:.08,type:'square',v:.05},
                {f:1500,t:.06,d:.1,type:'square',v:.05},{f:2300,t:.09,d:.09,type:'square',v:.05},{f:900,t:.05,d:.35,type:'sawtooth',v:.07},{f:180,t:0,d:.4,type:'triangle',v:.16} ],
+  // v0.50-b 警戒音「wap」：短促上滑的方波加一點低音
+  alert: [ {f:330,t:0,d:.09,type:'square',v:.12},{f:660,t:.07,d:.16,type:'square',v:.12},{f:165,t:0,d:.2,type:'sawtooth',v:.08} ],
+  // v0.50-a4 腳步聲：左右腳各一組，音高略不同，很短很輕
+  step:  [ {f:150,t:0,d:.07,type:'triangle',v:.12},{f:70,t:0,d:.09,type:'sine',v:.16},{f:900,t:0,d:.025,type:'square',v:.012} ],
+  stepB: [ {f:130,t:0,d:.07,type:'triangle',v:.12},{f:62,t:0,d:.09,type:'sine',v:.16},{f:760,t:0,d:.025,type:'square',v:.012} ],
   turnEnemy: [ {f:311,t:0,d:.26,type:'triangle',v:.17},{f:233,t:.11,d:.34,type:'triangle',v:.15} ],
 };
-function playCue(name){
+function playCue(name, vol){
   const file = SFX_FILES[name];
-  if(file){ playSound(file, 0.7); return; }
+  if(file){ playSound(file, vol != null ? vol : 0.7); return; }
+  const vs = vol != null ? vol : 1;
   try{
     const AC = window.AudioContext || window.webkitAudioContext;
     if(!AC) return;
@@ -5213,7 +5484,7 @@ function playCue(name){
       const osc = __audioCtx.createOscillator(), g = __audioCtx.createGain();
       osc.type = n.type || 'square';
       osc.frequency.value = n.f;
-      const v = n.v != null ? n.v : .11;
+      const v = (n.v != null ? n.v : .11) * vs;
       g.gain.setValueAtTime(0.0001, t0+n.t);
       g.gain.exponentialRampToValueAtTime(v, t0+n.t+.015);
       g.gain.exponentialRampToValueAtTime(0.0001, t0+n.t+n.d);
@@ -5302,8 +5573,13 @@ function shatterElement(focus, ms){
   });
   focus.style.visibility = 'hidden';
 }
+/* 【v0.50-b3】戰鬥重要度：def.importance（1~5，沒填＝有 introStyle:'boss' 就是5，否則1）。
+   只套用在探索觸發的戰鬥：5＝維持原本全黑幕＋人物滑入演出；4以下＝只蓋一層 BATTLE_INTRO.dimAlpha 的陰暗（人物就站在原位，不滑入）。 */
+function battleImportance(def){ return def.importance || (def.introStyle === 'boss' ? 5 : 1); }
+function battleIntroIsDim(def){ return !!(battle && battle.fromExplore && battleImportance(def) < 5); }
 async function playBattleIntro(def, onCovered){
   const B = BATTLE_INTRO;
+  const dim = battleIntroIsDim(def);
   const boss = def.introStyle === 'boss';
   miniLogClear();
   const wrap = document.createElement('div');
@@ -5318,6 +5594,7 @@ async function playBattleIntro(def, onCovered){
   const flash = wrap.querySelector('.intro-flash');
   const commence = wrap.querySelector('.intro-commence');
   curtain.style.transitionDuration = B.curtainMs + 'ms';
+  if(dim) curtain.style.setProperty('--curtain-a', B.dimAlpha);
   document.body.appendChild(wrap);
   // 1. 黑幕
   await __nextFrame(); curtain.classList.add('show');
@@ -5353,12 +5630,17 @@ async function playBattleIntro(def, onCovered){
   // 4. 人物進場（我方從左、敵方從右，各自依序滑入）
   // v0.48：單位進場改由3D畫面處理（我方從左、敵方從右，依序滑入＋淡入；沿鏡頭左右方向）
   let maxIdx = 0;
-  if(battle){
+  if(battle && !dim){
     const us = allUnits();
     maxIdx = Math.max(battle.allies.length, battle.enemies.length) - 1;
     B3D.playEntrance(us, 550, B.unitStaggerMs);
   }
-  await __sleep(B.unitsInMs + maxIdx * B.unitStaggerMs);
+  if(battle && battle.walkIn){   // v0.50-b8：雙方同時走到隊形位置，走完（或最多等2.8秒）才進 COMMENCE
+    allUnits().forEach(u=>{ u._hold = false; });
+    const t0 = performance.now(); await __sleep(120);
+    while(!B3D.unitsIdle(allUnits()) && performance.now() - t0 < 2800) await __sleep(60);
+    await __sleep(150);
+  } else await __sleep(B.unitsInMs + maxIdx * B.unitStaggerMs);
   // 5. COMMENCE
   playCue('commence');
   commence.classList.add('show');
@@ -5368,7 +5650,7 @@ async function playBattleIntro(def, onCovered){
 }
 function finishBattleIntro(){
   document.querySelectorAll('.battle-intro').forEach(e=> e.remove());
-  if(battle) B3D.clearIntro(allUnits()); // v0.48：確保單位都顯示出來（沒播完/被中斷時的保險）
+  if(battle){ B3D.clearIntro(allUnits()); allUnits().forEach(u=>{ u._hold = false; }); } // v0.48：確保單位都顯示出來（沒播完/被中斷時的保險）
   if(!battle || battle.finished) return;
   battle.introPlaying = false;
   const a = currentActor();
@@ -5437,7 +5719,7 @@ function outroReturnToPrep(layer){
     const v = document.getElementById('viewBattle'); if(v) v.classList.remove('defeat-gray');
     if(battle) battle.outroPlaying = false;
     setNavLocked(false);
-    switchView('prep');
+    battleLeave();
   });
 }
 function rewardRowHtml(ico, en, zh, val){
@@ -5479,7 +5761,7 @@ async function playVictoryOutro(rw, newsNorm, newsFirst){
       if(newsFirst.length) h += newCardsHtml(newsFirst);
     }
   }
-  h += `</div><button class="btn primary rp-btn" id="btnBackPrep">Return 返回準備畫面</button>`;
+  h += `</div><button class="btn primary rp-btn" id="btnBackPrep">${battleReturnLabel(true)}</button>`;
   panel.innerHTML = h;
   await __sleep(350);
   panel.classList.add('show');
@@ -5520,7 +5802,7 @@ async function playDefeatOutro(){
   banner.classList.add('up');
   panel.innerHTML = `<div class="rp-title">DEFEAT<small>戰敗</small></div>
     <div class="rp-msg">The party has fallen... but only for now.<br>全隊倒下……幸好只是暫時的，隊伍已撤回休整。</div>
-    <button class="btn primary rp-btn" id="btnBackPrep">Return 返回準備畫面</button>`;
+    <button class="btn primary rp-btn" id="btnBackPrep">${battleReturnLabel(true)}</button>`;
   await __sleep(350);
   panel.classList.add('show');
   await __sleep(400);
@@ -5532,7 +5814,7 @@ async function playDefeatOutro(){
 function quickReturnToPrep(){
   stopBgmNow(); closeBattleOverlays(); miniLogClear();
   setNavLocked(false);
-  switchView('prep');
+  battleLeave();
 }
 
 /* ---------- 戰場UI：右上角提示小卡 ---------- */
@@ -5541,7 +5823,9 @@ function syncSelectionTip(){
   if(!tip || !battle) return;
   const sel = battle.selected || {};
   let tag=null, name=null, eff=null, color=null;
-  if(sel.mode === 'skill' && sel.skillDef){
+  if(battle.arena && battle.movePreview && !battleInArena(battle.movePreview.x, battle.movePreview.y)){
+    tag = 'MOVE 移動'; name = '逃跑格'; eff = '此處在戰鬥範圍外：確認移動（選擇行動或結束回合）時全隊會撤離戰鬥；改走別處即可取消'; color = '#f08a2a';
+  } else if(sel.mode === 'skill' && sel.skillDef){
     const d = sel.skillDef;
     tag = 'SKILL ' + ({attack:'ATTACK 攻擊',heal:'HEAL 治療',buff:'BUFF 增益',debuff:'DEBUFF 減益'}[d.type] || ''); name = d.name; eff = skillSummaryText(d); color = skillTypeColor(d.type);
   } else if(sel.mode === 'item' && sel.itemDef){
@@ -5766,7 +6050,15 @@ async function init(){
     if(p.level == null) p.level = 1;
     if(!p.training) p.training = { hp:0, sp:0, atk:0, def:0 };
   });
+  { // v0.50-b5：舊存檔的賽特補上閃光遷躍（放進第一個空的技能欄；已經有就不動）
+    const sete = state.party.find(p=>p.id==='sete');
+    if(sete && !sete.skills.some(iid=>{ const i = state.skillInstances[iid]; return i && i.key==='flash_leap'; })){
+      const slot = sete.skills.findIndex(s=>!s);
+      if(slot >= 0){ const iid = makeIid(state,'sk'); state.skillInstances[iid] = { key:'flash_leap', level:1, status:'equipped' }; sete.skills[slot] = iid; }
+    }
+  }
   validateAllMaps(); // v0.48：載入時檢查所有戰場地圖，不合格的寫進console，且該場戰鬥拒絕開戰
+  validateAllZones(); // v0.50-a：載入時檢查探索區域（地圖、戰鬥範圍、連通性）
   renderNav();
   switchView('chapters');
   initVersionTag();
@@ -5880,13 +6172,674 @@ function initVersionTag(){
   if(tag) tag.textContent = GAME_VERSION;
 }
 
+
+/* ============================================================
+   【v0.50-a】探索模式（階段A：只有走路＋大地圖，還沒有「踩進範圍開戰」）
+   ────────────────────────────────────────────────────────────
+   【怎麼調整】下面這些常數都可以直接改數字：
+   - EXPLORE_VIEW_RADIUS：清楚視野半徑（格）。12＝以隊長為中心 25×25 內完全清楚（敵人立繪也只在這個範圍內顯示）。
+   - EXPLORE_DIM_WIDTH / EXPLORE_DIM_DARK：清楚範圍外的「半透明黑霧」——往外這麼多格逐漸變暗到這個黑度（0~1，0.72＝72%黑），仍看得到地形輪廓。
+   - EXPLORE_FOG_OUT：黑霧外再往外這麼多格淡出到看不見。總繪製範圍＝半徑＋黑霧寬＋淡出寬（預設12+6+3＝21格，約43×43）；覺得卡就把黑霧寬／淡出寬調小。
+   - EXPLORE_WALK_ANIMS / EXPLORE_WALK_FRAME_MS / EXPLORE_WALK_FLIP：走路動畫（見下方說明）。
+   - 按住左鍵進入跟隨模式的時間：STAGE3D.holdMs（毫秒，預設250）。
+   - EXPLORE_ZOOM_MAX / EXPLORE_DEFAULT_DIST：鏡頭最遠距離／進入探索時的預設距離。
+   - EXPLORE_ARENA_COLOR：戰鬥範圍的地面標示色 [R,G,B,透明度]（階段B起，踩進這個範圍會開戰；透明度設0就看不到）。
+   區域資料在 EXPLORE_ZONES：每個區域有 build() 產生地圖矩陣、起點 start、戰鬥範圍 arenas。
+   載入時會驗證：地圖合法、起點能站、每個戰鬥範圍在地圖內、彼此至少隔 EXPLORE_ZONE_MIN_ARENA_GAP 格、
+   尺寸跟該場戰鬥的地圖一致、整張圖沒有走不到的孤島。
+============================================================ */
+const EXPLORE_VIEW_RADIUS = 12;
+const EXPLORE_DIM_WIDTH = 6;
+const EXPLORE_DIM_DARK = 0.72;
+const EXPLORE_FOG_OUT = 3;
+/* 走路動畫：圖檔 assets/portraits/<set>00.png ~ <set>05.png（與待命動畫同資料夾、同尺寸），移動時依序循環播放，停下來回到待命。
+   只有這張表有登記的角色才會用；圖找不到會自動退回靜態圖。要幫其他角色加：照樣加一行（set＝檔名前綴，frames＝張數）。 */
+const EXPLORE_WALK_ANIMS = {
+  daren: { set:'daren_walk', frames:6 },
+};
+const EXPLORE_WALK_FRAME_MS = 90;      // 每張停留幾毫秒（太快就調大、太慢就調小）
+/* 左右翻轉：圖只有一種朝向，往螢幕另一側走時要不要鏡射。
+   'none'＝不翻；'artFacesRight'＝圖原本朝右（往左走時翻）；'artFacesLeft'＝圖原本朝左（往右走時翻）。 */
+const EXPLORE_WALK_FLIP = 'artFacesRight';   // v0.50-a4：預設假設圖朝右；若實際看起來左右相反，改成 'artFacesLeft'；不想翻就 'none'
+/* 路線顏色：探索時「隊長接下來要走的格子」，用跟戰鬥移動範圍一樣的水藍色（只亮前方剩餘路線，走過的格子立刻熄掉）。 */
+const EXPLORE_ROUTE_COLOR = [0.22, 0.74, 0.88, 0.62];
+/* 走路腳步聲：EXPLORE_STEP_SFX=false 關閉；EXPLORE_STEP_VOL 音量(0~1)；
+   想換成真的音效檔：把 SFX_FILES.step（和可選的 stepB，左右腳交替）填成 'assets/sfx/step.mp3'，沒填就用程式合成的輕輕「踏」聲。 */
+const EXPLORE_STEP_SFX = true;
+const EXPLORE_STEP_VOL = 0.7;
+/* 警戒演出：走進戰鬥範圍時頭上跳出「！」並停頓這麼多毫秒才開戰；音效預設程式合成的「wap」，要用自己的檔案：SFX_FILES.alert = 'assets/sfx/xxx.mp3'。 */
+const EXPLORE_ALERT_MS = 800;
+/* v0.50-b6：「！」、鏡頭平移到戰鬥範圍中心、開戰準備三件事同時進行；平移花的時間＝上面的停頓時間（想讓平移比「！」短／長，改下面這個）。 */
+const EXPLORE_PAN_MS = EXPLORE_ALERT_MS;
+/* v0.50-b7：戰鬥結束（贏／逃／敗）回探索時，鏡頭從戰場飛回隊長所花的時間；這段時間操作鎖定。想要瞬間回去就設 0。 */
+const EXPLORE_RETURN_MS = 900;
+/* 觸發區：戰鬥範圍往內縮這麼多格（12×12 縮3＝6×6），走進觸發區才開戰；每個範圍可用 inset 另外指定（0＝整個範圍）。 */
+const EXPLORE_TRIGGER_INSET = 3;
+const EXPLORE_ARENA_FAINT = [0.80, 0.34, 0.28, 0.08];   // 戰鬥範圍本身的淡色底（逃跑格的邊界），觸發區用 EXPLORE_ARENA_COLOR
+function arenaTrigger(x,y,w,h,inset){
+  const i = inset != null ? inset : EXPLORE_TRIGGER_INSET;
+  const k = Math.max(0, Math.min(i, Math.floor((Math.min(w,h)-1)/2)));
+  return { x:x+k, y:y+k, w:w-2*k, h:h-2*k };
+}
+/* ============================================================
+   【v0.50-b5】巡邏隊（動態遭遇）
+   - 區域資料 EXPLORE_ZONES[zid].patrols：[{ id, battle:'戰鬥key', alert:警戒範圍 }]；成員數量＝該戰鬥 enemies() 的數量，第一位＝隊長。
+   - 警戒範圍 alert＝我方隊長與敵方隊長「之間隔著幾個空格」；座標差＝alert+1；只要切比雪夫距離（方形）≤ alert+1 就觸發，不管誰先走進誰的範圍。
+   - 觸發後戰場大小動態決定：雙方隊長＋各自隊形（BATTLE_FORMATION）外加 PATROL_ARENA_MARGIN 格邊界。範圍外＝逃跑格。
+   - 巡邏：隊長隨機走（PATROL_KEEP_DIR 機率沿用上一步方向），隊員用「蛇形」跟在隊長走過的格子上。
+   - 戰鬥結束（贏／逃／敗）巡邏隊一律在離玩家 PATROL_RESPAWN_MIN~MAX 格的地方重生（無限重生）。
+   想調整的地方都在下面這組常數。
+============================================================ */
+const EXPLORE_DEFAULT_ZONE = 'rabbit_field';      // 進探索畫面預設的區域（要回訓練營地就改 'training_camp'；畫面左上角也能切換）
+const PATROL_STEP_MS = 650;                       // 巡邏隊走一格的間隔（毫秒）；越小走越快
+const PATROL_PAUSE_CHANCE = 0.2;                  // 每步有這個機率停下來發呆
+const PATROL_PAUSE_MS = 700;                      // 發呆多久
+const PATROL_KEEP_DIR = 0.6;                      // 沿用上一步方向的機率（越高越像直線走、越低越像醉漢）
+const PATROL_RESPAWN_MIN = 14, PATROL_RESPAWN_MAX = 26;   // 重生位置離玩家隊長的最近／最遠距離（格）
+const PATROL_COOLDOWN_MS = 3000;                  // 逃跑／戰敗回到探索後，該巡邏隊留在原地（恢復戰前原狀），這麼久之內不巡邏、也不會再開戰（從鏡頭飛回完成後開始算）
+const PATROL_ARENA_MARGIN = 3;                    // 動態戰場：隊形外再多留幾格邊界
+const PATROL_ARENA_MIN = 9;                       // 動態戰場最小邊長
+const EXPLORE_SHOW_ALERT_RANGE = true;            // 測試用：在地面畫出每支巡邏隊的警戒範圍（方框）；不想看到就改 false
+const EXPLORE_ALERT_RANGE_COLOR = [0.90, 0.25, 0.20, 0.13];
+const PATROL_DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+function cheb(ax,ay,bx,by){ return Math.max(Math.abs(ax-bx), Math.abs(ay-by)); }
+function patrolOccupied(ex, x, y, self){
+  if(ex.leader.x===x && ex.leader.y===y) return true;
+  return (ex.patrols||[]).some(q=> q.units.some(u=> u.x===x && u.y===y));
+}
+function patrolSpawn(ex, p){
+  const m = ex.map, P = ex.leader;
+  ex.decor = ex.decor.filter(d=> d.patrolId !== p.id);
+  let pos = null;
+  const okTile = (x,y)=> x>=4 && y>=4 && x<m.cols-4 && y<m.rows-4 && mapTerrain(m,x,y).passable && cheb(x,y,P.x,P.y) >= PATROL_RESPAWN_MIN;
+  for(let t=0; t<300 && !pos; t++){
+    const ang = Math.random()*Math.PI*2, dist = PATROL_RESPAWN_MIN + Math.random()*(PATROL_RESPAWN_MAX-PATROL_RESPAWN_MIN);
+    const x = Math.round(P.x + Math.cos(ang)*dist), y = Math.round(P.y + Math.sin(ang)*dist);
+    if(okTile(x,y)) pos = [x,y];
+  }
+  for(let y=4; y<m.rows-4 && !pos; y++) for(let x=4; x<m.cols-4 && !pos; x++) if(okTile(x,y)) pos = [x,y];   // 保底：找不到隨機點就掃整張圖
+  if(!pos) pos = [4,4];
+  // 初始隊形：沿某個方向排成一列（走得通才用），否則疊在隊長那格
+  let hist = null;
+  const dirs = PATROL_DIRS.slice().sort(()=>Math.random()-0.5);
+  for(const [dx,dy] of dirs){
+    const line = []; let ok = true;
+    for(let i=0;i<p.n && ok;i++){ const x = pos[0]-dx*i, y = pos[1]-dy*i; if(x<1||y<1||x>=m.cols-1||y>=m.rows-1||!mapTerrain(m,x,y).passable) ok = false; else line.push([x,y]); }
+    if(ok){ hist = line; p.dir = [dx,dy]; break; }
+  }
+  if(!hist){ hist = []; for(let i=0;i<p.n;i++) hist.push(pos.slice()); p.dir = dirs[0]; }
+  p.hist = hist;
+  p.units = hist.map((h,i)=>({ arenaId:p.id, patrolId:p.id, id:`patrol_${p.id}_${Date.now()%100000}_${i}`, portraitKey:p.proto[i].portraitKey, name:p.proto[i].name, side:'enemy', hp:1, maxHp:1, x:h[0], y:h[1], _dx:h[0], _dy:h[1], isLeader:i===0 }));
+  p.units.forEach(u=> ex.decor.push(u));
+  p.nextAt = performance.now() + PATROL_STEP_MS;
+}
+function patrolInit(ex, zone){
+  ex.patrols = [];
+  (zone.patrols || []).forEach(def=>{
+    const proto = BATTLES[def.battle].enemies();
+    const p = { id:def.id, def, proto, n:proto.length, units:[], hist:[], dir:[1,0], nextAt:0, alert: def.alert != null ? def.alert : 4 };
+    ex.patrols.push(p); patrolSpawn(ex, p);
+  });
+  ex.alertQueue = [];
+}
+function patrolStep(ex, p, now){
+  if(now < p.nextAt) return false;
+  if(Math.random() < PATROL_PAUSE_CHANCE){ p.nextAt = now + PATROL_PAUSE_MS; return false; }
+  const m = ex.map, head = p.hist[0];
+  const order = PATROL_DIRS.slice().sort(()=>Math.random()-0.5);
+  if(Math.random() < PATROL_KEEP_DIR) order.unshift(p.dir);
+  for(const [dx,dy] of order){
+    const nx = head[0]+dx, ny = head[1]+dy;
+    if(nx<1||ny<1||nx>=m.cols-1||ny>=m.rows-1) continue;
+    if(mapStepCost(m,'walk',head[0],head[1],nx,ny) === Infinity) continue;
+    if(patrolOccupied(ex,nx,ny)) continue;
+    p.hist.unshift([nx,ny]); p.hist.length = p.n;
+    p.units.forEach((u,i)=>{ u.x = u._dx = p.hist[i][0]; u.y = u._dy = p.hist[i][1]; });
+    p.dir = [dx,dy]; p.nextAt = now + PATROL_STEP_MS;
+    return true;
+  }
+  p.nextAt = now + PATROL_STEP_MS;
+  return false;
+}
+/* 每個 tick：巡邏隊移動 → 判斷警戒範圍（FIFO：先進入範圍的先處理；理論上不會有兩隊同時進入，這是保險） */
+function explorePatrolTick(ex){
+  if(!ex.patrols || !ex.patrols.length) return;
+  const now = performance.now(); let moved = false;
+  ex.patrols.forEach(p=>{ if(patrolStep(ex,p,now)) moved = true; });
+  if(moved){ exploreRefreshRects(); updateExploreHud(); }
+  explorePatrolCheck(ex);
+}
+function explorePatrolCheck(ex){
+  if(ex.locked) return;
+  ex.patrols.forEach(p=>{
+    if(p.coolUntil && performance.now() < p.coolUntil){ ex.alertQueue = ex.alertQueue.filter(q=>q!==p); return; }   // 冷卻中：不觸發
+    const h = p.hist[0], inR = cheb(ex.leader.x, ex.leader.y, h[0], h[1]) <= p.alert + 1;
+    if(inR && !ex.alertQueue.includes(p)) ex.alertQueue.push(p);
+    if(!inR) ex.alertQueue = ex.alertQueue.filter(q=>q!==p);
+  });
+  if(ex.alertQueue.length){ const p = ex.alertQueue.shift(); exploreTriggerPatrol(p); }
+}
+function exploreTriggerPatrol(p){
+  const ex = explore; if(ex.locked) return;
+  const a = { id:p.id, dynamic:true, patrol:p, battle:p.def.battle, repeat:true, label:'巡邏隊' };
+  const L = ex.leader, prev = ex.lastTile || [L.x, L.y];
+  exploreTrigger(a, prev, [L.x, L.y]);
+}
+/* 動態戰場：雙方隊長面對面（取座標差較大的那一軸當朝向），隊形各自排在隊長身後；戰場＝兩隊所有站位的外框＋邊界 */
+function dynamicArena(ex, p){
+  const m = ex.map, P = ex.leader, E = p.hist[0];
+  const dx = E[0]-P.x, dy = E[1]-P.y;
+  const f = Math.abs(dx) >= Math.abs(dy) ? [Math.sign(dx)||1, 0] : [0, Math.sign(dy)||1];
+  const pp = [-f[1], f[0]];
+  const nA = Math.max(1, state.party.filter(q=>q.active).length), nE = p.n;
+  const depth = n=> Math.max(...BATTLE_FORMATION.slice(0,n).map(v=>v[0]), 0), side = n=> Math.max(...BATTLE_FORMATION.slice(0,n).map(v=>Math.abs(v[1])), 0);
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  const add = (x,y)=>{ x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y); };
+  [[P.x,P.y,f,nA],[E[0],E[1],[-f[0],-f[1]],nE]].forEach(([lx,ly,g,n])=>{
+    const dp = depth(n), sd = side(n);
+    [-sd,0,sd].forEach(s=>{ add(lx - g[0]*dp + pp[0]*s, ly - g[1]*dp + pp[1]*s); add(lx + pp[0]*s, ly + pp[1]*s); });
+  });
+  x0-=PATROL_ARENA_MARGIN; y0-=PATROL_ARENA_MARGIN; x1+=PATROL_ARENA_MARGIN; y1+=PATROL_ARENA_MARGIN;
+  while(x1-x0+1 < PATROL_ARENA_MIN){ x0--; x1++; } while(y1-y0+1 < PATROL_ARENA_MIN){ y0--; y1++; }
+  x0=Math.max(0,x0); y0=Math.max(0,y0); x1=Math.min(m.cols-1,x1); y1=Math.min(m.rows-1,y1);
+  return { arena:{ x:x0, y:y0, w:x1-x0+1, h:y1-y0+1 }, entry:{ x:P.x, y:P.y, dx:f[0], dy:f[1] }, enemyEntry:{ x:E[0], y:E[1], dx:-f[0], dy:-f[1] } };
+}
+function exploreRects(){
+  const ex = explore; if(!ex) return [];
+  const r = (ex.map.arenas || []).filter(a=>!ex.cleared[a.id]).flatMap(a=>[{ x:a.x, y:a.y, w:a.w, h:a.h, c:EXPLORE_ARENA_FAINT }, { x:a.trig.x, y:a.trig.y, w:a.trig.w, h:a.trig.h, c:EXPLORE_ARENA_COLOR }]);
+  if(EXPLORE_SHOW_ALERT_RANGE && ex.patrols) ex.patrols.forEach(p=>{
+    const h = p.hist[0], R = p.alert + 1, m = ex.map;
+    const x0 = Math.max(0,h[0]-R), y0 = Math.max(0,h[1]-R), x1 = Math.min(m.cols-1,h[0]+R), y1 = Math.min(m.rows-1,h[1]+R);
+    r.push({ x:x0, y:y0, w:x1-x0+1, h:y1-y0+1, c:EXPLORE_ALERT_RANGE_COLOR });
+  });
+  return r;
+}
+function exploreRefreshRects(){ if(typeof B3D !== 'undefined' && explore) B3D.setScene({ rects: exploreRects() }); }
+/* ============================================================
+   【v0.50-b6】探索時隊友排隊跟隨：隊友（上場名單裡除了隊長以外的人）走在隊長走過的格子上（蛇形，一人一格）。
+   只是顯示用——戰鬥開始時我方仍照 BATTLE_FORMATION 重新排隊形。想關掉：EXPLORE_PARTY_FOLLOW = false。
+============================================================ */
+const EXPLORE_PARTY_FOLLOW = true;
+function exploreBuildFollowers(){
+  const ex = explore; if(!ex) return;
+  const L = ex.leader, m = ex.map;
+  const mem = EXPLORE_PARTY_FOLLOW ? state.party.filter(q=>q.active && q.id !== L.id) : [];
+  const n = mem.length;
+  let trail = null;
+  const dirs = PATROL_DIRS.slice();
+  for(const [dx,dy] of dirs){
+    const line = []; let ok = true;
+    for(let i=0;i<=n && ok;i++){ const x = L.x-dx*i, y = L.y-dy*i; if(!mapIn(m,x,y) || !mapTerrain(m,x,y).passable) ok = false; else line.push([x,y]); }
+    if(ok){ trail = line; break; }
+  }
+  if(!trail){ trail = []; for(let i=0;i<=n;i++) trail.push([L.x,L.y]); }
+  ex.trail = trail;
+  ex.followers = mem.map((q,i)=>({ id:q.id, name:q.name, side:'ally', hp:1, maxHp:1, follower:true, x:trail[i+1][0], y:trail[i+1][1], _dx:trail[i+1][0], _dy:trail[i+1][1] }));
+}
+function exploreFollowersStep(px, py, nx, ny){
+  const ex = explore; if(!ex || !ex.followers || !ex.followers.length) return;
+  ex.trail.unshift([nx,ny]); ex.trail.length = ex.followers.length + 1;
+  ex.followers.forEach((u,i)=>{ const t = ex.trail[i+1]; u.x = u._dx = t[0]; u.y = u._dy = t[1]; });
+}
+function exploreAllUnits(){ const ex = explore; return [ex.leader].concat(ex.followers || [], ex.decor); }
+function exploreSyncUnits(){ if(typeof B3D !== 'undefined' && explore) B3D.setScene({ units: exploreAllUnits() }); }
+const EXPLORE_ZOOM_MAX = 34;
+const EXPLORE_DEFAULT_DIST = 21;
+const EXPLORE_ARENA_COLOR = [0.80, 0.34, 0.28, 0.22];
+const EXPLORE_ZONE_MIN_ARENA_GAP = 3;
+const EXPLORE_WALK_STEP_MS = Math.round(STAGE3D.moveSecPerTile * 1000 * 0.98); // 走一格的間隔（略短於動畫時間，動畫才不會斷）
+
+/* ---------- 訓練營地：84×48 ----------
+   x 0~47 是營地（3×3 的區塊，每塊16格，戰鬥範圍12×12放在每塊中間，區塊之間是4格寬的街道）；
+   東邊 x 48~83 是野外：一條河（x52~54，只有淺灘能過）＋長路，路的盡頭 x62~75 是毀滅者的競技場。
+   起點在營地廣場中央 (24,24)，到毀滅者競技場入口 (62,24) 走 38 格、到場中央約 45 格。 */
+function buildTrainingCamp(){
+  const W = 84, H = 48;
+  const T = [], HT = [];
+  for(let y=0;y<H;y++){ T.push(new Array(W).fill('.')); HT.push(new Array(W).fill(0)); }
+  let seed = 20261008;
+  const rnd = ()=>{ seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  const put = (x,y,ch,h)=>{ if(x<0||y<0||x>=W||y>=H) return; T[y][x] = ch; if(h != null) HT[y][x] = h; };
+  const fill = (x0,y0,x1,y1,ch,h)=>{ for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++) put(x,y,ch,h); };
+
+  // 1) 底：草地＋零星森林＋岩石團塊＋外框岩壁
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(rnd() < 0.11) T[y][x] = 'f';
+  for(let i=0;i<28;i++){
+    const cx = Math.floor(rnd()*W), cy = Math.floor(rnd()*H), r = 1 + Math.floor(rnd()*2);
+    for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++) if(dx*dx+dy*dy <= r*r+1) put(cx+dx, cy+dy, 'r', 0);
+  }
+  for(let x=0;x<W;x++){ put(x,0,'r',0); put(x,H-1,'r',0); }
+  for(let y=0;y<H;y++){ put(0,y,'r',0); put(W-1,y,'r',0); }
+
+  // 2) 野外小丘（東南）
+  for(let y=30;y<=44;y++) for(let x=60;x<=76;x++){
+    const d = Math.hypot(x-68, y-37);
+    if(d <= 7){ T[y][x] = '.'; HT[y][x] = d < 3 ? 3 : d < 5 ? 2 : 1; }
+  }
+  // 3) 營地右下區塊（34~45, 34~45）：階梯小丘
+  for(let y=34;y<=45;y++) for(let x=34;x<=45;x++){
+    const d = Math.hypot(x-39.5, y-39.5);
+    T[y][x] = '.'; HT[y][x] = d < 2.6 ? 2 : d < 4.6 ? 1 : 0;
+  }
+  // 4) 營地右中區塊（34~45, 18~29）：兩片樹林夾著往東的路
+  fill(34,18,45,20,'f',0); fill(34,27,45,29,'f',0);
+
+  // 5) 戰鬥範圍：貼入既有戰鬥地圖（每塊中間，12×12；毀滅者14×12在東邊）
+  const ARENAS = [   // repeat:true＝可重複觸發（訓練人偶，打贏人偶仍在）；沒寫＝一次性（打贏後敵人消失、不再觸發）
+    { id:'goblin',   battle:'goblin_patrol',       mapKey:'goblin_patrol',   x:2,  y:2,  label:'哥布林巡邏隊', decor:['goblin','哥布林','goblin','哥布林','goblin','哥布林薩滿'] },
+    { id:'byakhee',  battle:'byakhee_trio',        mapKey:'byakhee_trio',    x:18, y:2,  label:'拜亞基三重奏', decor:['byakhee','拜亞基','byakhee','拜亞基','byakhee','拜亞基'] },
+    { repeat:true, id:'dummy_t',  battle:'training_dummy_solo', mapKey:'flat12',          x:34, y:2,  label:'訓練人偶',     decor:['trainingDummy','訓練人偶'] },
+    { repeat:true, id:'dummy_a',  battle:'archer_dummy_solo',   mapKey:'flat12',          x:2,  y:18, label:'弓箭人偶',     decor:['archerDummy','弓箭人偶'] },
+    { repeat:true, id:'dummy_m',  battle:'mana_dummy_solo',     mapKey:'flat12',          x:2,  y:34, label:'魔力人偶',     decor:['manaDummy','魔力人偶'] },
+    { repeat:true, id:'dummy_l',  battle:'leader_dummy_solo',   mapKey:'flat12',          x:18, y:34, label:'領隊人偶',     decor:['leaderDummy','領隊人偶'] },
+    { id:'destroyer',battle:'destroyer_solo',      mapKey:'destroyer_arena', x:62, y:18, label:'毀滅者',       decor:['destroyer','毀滅者'] },
+  ];
+  const arenas = ARENAS.map(a=>{
+    const src = parseMapDef(a.mapKey, BATTLE_MAPS[a.mapKey]);
+    const w = src.cols, h = src.rows;
+    for(let yy=0;yy<h;yy++) for(let xx=0;xx<w;xx++){ put(a.x+xx, a.y+yy, src.T[yy][xx], src.H[yy][xx]); }
+    const decor = [];
+    for(let i=0;i<a.decor.length;i+=2){
+      const sp = src.enemySpawns[i/2] || src.enemySpawns[0];
+      decor.push({ portraitKey:a.decor[i], name:a.decor[i+1], x:a.x+sp[0], y:a.y+sp[1] });
+    }
+    return { id:a.id, battle:a.battle, mapKey:a.mapKey, x:a.x, y:a.y, w, h, label:a.label, decor, repeat:!!a.repeat, trig:arenaTrigger(a.x,a.y,w,h,a.inset) };
+  });
+  // 毀滅者競技場四周是岩壁：在西側開一個兩格寬的入口
+  put(62,23,'.',0); put(62,24,'.',0);
+
+  // 6) 街道（4格寬）＋廣場，蓋掉前面隨機的樹石
+  fill(14,1,17,46,'.',0); fill(30,1,33,46,'.',0);     // 兩條縱向街道
+  fill(1,14,47,17,'.',0); fill(1,30,47,33,'.',0);     // 兩條橫向街道
+  fill(18,18,29,29,'.',0);                            // 營地廣場（起點在中央）
+  // 7) 往毀滅者的長路（y21~26）、河（x52~54）與淺灘
+  fill(46,21,61,26,'.',0);
+  fill(56,23,57,24,'f',0);                            // 路中央一小叢樹：要繞或硬穿（森林耗2）
+  fill(55,22,56,22,'m',0);                            // 泥地
+  fill(52,1,54,H-2,'w',0);                            // 河
+  fill(52,21,54,26,'m',0);                            // 淺灘（泥沼，可走）
+
+  // 8) 封掉「走不到的孤島」：從起點洪水填充，沒到的可站格（戰鬥範圍內除外）一律變岩壁，避免亂數樹石圍出走不到的口袋
+  const start = [24,24];
+  const walk = (ax,ay,bx,by)=>{ const tb = TERRAIN_DB[T[by][bx]]; return tb.passable && Math.abs(HT[by][bx]-HT[ay][ax]) < HEIGHT_DIFF_BLOCK_AT; };
+  const seen = new Uint8Array(W*H), q = [start[1]*W+start[0]]; seen[q[0]] = 1;
+  while(q.length){ const k = q.pop(), cx = k % W, cy = (k-cx)/W;
+    for(const [dx,dy] of DIRS4){ const nx = cx+dx, ny = cy+dy; if(nx<0||ny<0||nx>=W||ny>=H||seen[ny*W+nx]) continue; if(!walk(cx,cy,nx,ny)) continue; seen[ny*W+nx] = 1; q.push(ny*W+nx); } }
+  const inArena = (x,y)=> arenas.some(a=> x>=a.x && x<a.x+a.w && y>=a.y && y<a.y+a.h);
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(TERRAIN_DB[T[y][x]].passable && !seen[y*W+x] && !inArena(x,y)){ T[y][x] = 'r'; HT[y][x] = 0; }
+
+  return { terrain: T.map(r=>r.join('')), height: HT.map(r=>r.join('')), start, arenas };
+}
+/* ---------- v0.50-b5：空曠草原（60×60，全是草地、沒有任何障礙），起點在正中央，巡邏隊測試用 ---------- */
+function buildGrassField(W, H){
+  const T = [], HT = [];
+  for(let y=0;y<H;y++){ T.push('.'.repeat(W)); HT.push('0'.repeat(W)); }
+  return { terrain:T, height:HT, start:[Math.floor(W/2), Math.floor(H/2)], arenas:[] };
+}
+/* ---------- 空曠大地圖（測規格用）：草地＋零星樹林／池塘／小丘／岩石團塊，起點在正中央。
+   沿著起點往東每10格有一個泥地記號、每50格有一根岩柱，方便判斷走了多遠。沒有戰鬥範圍。 */
+function buildOpenField(W, H, seed0){
+  const T = [], HT = [];
+  for(let y=0;y<H;y++){ T.push(new Array(W).fill('.')); HT.push(new Array(W).fill(0)); }
+  let seed = seed0;
+  const rnd = ()=>{ seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  const put = (x,y,ch,h)=>{ if(x<0||y<0||x>=W||y>=H) return; T[y][x] = ch; if(h != null) HT[y][x] = h; };
+  const area = W*H;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(rnd() < 0.04) T[y][x] = 'f';
+  for(let i=0;i<Math.floor(area/4000);i++){ const cx=Math.floor(rnd()*W), cy=Math.floor(rnd()*H), r=3+Math.floor(rnd()*4);
+    for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++) if(dx*dx+dy*dy<=r*r) put(cx+dx,cy+dy,'w',0); }
+  for(let i=0;i<Math.floor(area/5000);i++){ const cx=Math.floor(rnd()*W), cy=Math.floor(rnd()*H), R=5+Math.floor(rnd()*5);
+    for(let dy=-R;dy<=R;dy++) for(let dx=-R;dx<=R;dx++){ const d=Math.hypot(dx,dy); if(d<=R){ const x=cx+dx, y=cy+dy; if(x>0&&y>0&&x<W-1&&y<H-1){ T[y][x]='.'; HT[y][x]=Math.max(HT[y][x], Math.max(0, 3 - Math.floor(d/(R/3.5)))); } } } }
+  for(let i=0;i<Math.floor(area/1500);i++){ const cx=Math.floor(rnd()*W), cy=Math.floor(rnd()*H), r=1+Math.floor(rnd()*2);
+    for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++) if(dx*dx+dy*dy<=r*r+1) put(cx+dx,cy+dy,'r',0); }
+  for(let x=0;x<W;x++){ put(x,0,'r',0); put(x,H-1,'r',0); }
+  for(let y=0;y<H;y++){ put(0,y,'r',0); put(W-1,y,'r',0); }
+  const sx = Math.floor(W/2), sy = Math.floor(H/2);
+  for(let y=sy-3;y<=sy+3;y++) for(let x=sx-3;x<=sx+3;x++) put(x,y,'.',0);       // 起點周圍清空
+  for(let d=10; sx+d<W-1; d+=10){ put(sx+d,sy,d%50===0?'r':'m',0); if(d%50===0) put(sx+d,sy+1,'r',0); }  // 距離記號
+  // 洪水填充，封掉走不到的口袋
+  const walk = (ax,ay,bx,by)=> TERRAIN_DB[T[by][bx]].passable && Math.abs(HT[by][bx]-HT[ay][ax]) < HEIGHT_DIFF_BLOCK_AT;
+  const seen = new Uint8Array(W*H), q = [sy*W+sx]; seen[q[0]] = 1;
+  while(q.length){ const k = q.pop(), cx = k % W, cy = (k-cx)/W;
+    for(const [dx,dy] of DIRS4){ const nx=cx+dx, ny=cy+dy; if(nx<0||ny<0||nx>=W||ny>=H||seen[ny*W+nx]) continue; if(!walk(cx,cy,nx,ny)) continue; seen[ny*W+nx]=1; q.push(ny*W+nx); } }
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(TERRAIN_DB[T[y][x]].passable && !seen[y*W+x]){ T[y][x]='r'; HT[y][x]=0; }
+  return { terrain: T.map(r=>r.join('')), height: HT.map(r=>r.join('')), start:[sx,sy], arenas:[] };
+}
+const EXPLORE_ZONES = {
+  training_camp: { name:'訓練營地', titleEn:'Training Camp', build: buildTrainingCamp },
+  rabbit_field:  { name:'小兔子草原 60×60', titleEn:'Rabbit Meadow', build: ()=>buildGrassField(60,60), patrols:[ { id:'rabbits', battle:'rabbit_patrol', alert:4 } ] },
+  big_160:       { name:'大地圖測試 160×160', titleEn:'Open Field 160', build: ()=>buildOpenField(160,160,20261009) },
+  huge_320:      { name:'大地圖測試 320×320', titleEn:'Open Field 320', build: ()=>buildOpenField(320,320,20261010) },
+};
+const ZONE_CACHE = {};
+function getZoneMap(zid){
+  if(!ZONE_CACHE[zid]){
+    const z = EXPLORE_ZONES[zid];
+    const m = parseMapDef('zone:'+zid, z ? z.build() : null);
+    if(m.ok){
+      const v = validateMapDef(m, null, 'zone');
+      m.errors = v.errors.slice(); m.warnings = v.warnings.slice();
+      // 戰鬥範圍檢查
+      const A = m.arenas || [];
+      A.forEach(a=>{
+        if(a.x < 0 || a.y < 0 || a.x + a.w > m.cols || a.y + a.h > m.rows) m.errors.push(`戰鬥範圍「${a.id}」超出地圖`);
+        const bm = BATTLE_MAPS[a.mapKey];
+        if(!BATTLES[a.battle]) m.errors.push(`戰鬥範圍「${a.id}」的戰鬥「${a.battle}」不存在`);
+        if(!bm) m.errors.push(`戰鬥範圍「${a.id}」的戰鬥地圖「${a.mapKey}」不存在`);
+        else if(bm.terrain[0].length !== a.w || bm.terrain.length !== a.h) m.errors.push(`戰鬥範圍「${a.id}」尺寸${a.w}×${a.h}與戰鬥地圖不一致`);
+        (a.decor||[]).forEach(d=>{ const t = a.trig; if(t && !(d.x>=t.x && d.x<t.x+t.w && d.y>=t.y && d.y<t.y+t.h)) m.warnings.push(`戰鬥範圍「${a.id}」的敵人(${d.x},${d.y})在觸發區外（玩家可貼著敵人而不開戰）`); });
+        if(m.start[0] >= a.x && m.start[0] < a.x+a.w && m.start[1] >= a.y && m.start[1] < a.y+a.h) m.errors.push(`起點在戰鬥範圍「${a.id}」裡（一進來就會開戰）`);
+      });
+      for(let i=0;i<A.length;i++) for(let j=i+1;j<A.length;j++){
+        const a = A[i], b = A[j];
+        const gap = Math.max(a.x-(b.x+b.w), b.x-(a.x+a.w), a.y-(b.y+b.h), b.y-(a.y+a.h));
+        if(gap < EXPLORE_ZONE_MIN_ARENA_GAP) m.errors.push(`戰鬥範圍「${a.id}」與「${b.id}」只隔${gap}格（至少${EXPLORE_ZONE_MIN_ARENA_GAP}格）`);
+      }
+      m.ok = m.errors.length === 0;
+    }
+    ZONE_CACHE[zid] = m;
+  }
+  return ZONE_CACHE[zid];
+}
+function validateAllZones(){
+  const report = {};
+  Object.keys(EXPLORE_ZONES).forEach(zid=>{
+    delete ZONE_CACHE[zid];
+    const m = getZoneMap(zid);
+    report[zid] = { ok:m.ok, errors:m.errors, warnings:m.warnings, size:m.cols ? m.cols+'x'+m.rows : '?', arenas:(m.arenas||[]).length };
+    if(!m.ok) console.error('[zone] 區域「'+zid+'」驗證失敗：', m.errors);
+  });
+  return report;
+}
+
+/* ---------- 探索狀態與操作 ---------- */
+let explore = null;       // { zoneId, map, leader, decor[], path[], nextStepAt, reach }
+let exploreTimer = null;
+
+function exploreStepCost(ax,ay,bx,by){ return mapStepCost(explore.map, 'walk', ax,ay,bx,by); }
+function exploreReach(){
+  const ex = explore;
+  if(!ex.reach || ex.reachAt !== ex.leader.x+','+ex.leader.y){
+    ex.reach = mapDijkstra(ex.map, [[ex.leader.x, ex.leader.y, 0]], { step: exploreStepCost });
+    ex.reachAt = ex.leader.x+','+ex.leader.y;
+  }
+  return ex.reach;
+}
+function exploreTriggerAt(x,y){
+  return (explore.map.arenas || []).find(a=>{ const t = a.trig || a; return x>=t.x && x<t.x+t.w && y>=t.y && y<t.y+t.h; }) || null;
+}
+function exploreArenaAt(x,y){
+  return (explore.map.arenas || []).find(a=> x>=a.x && x<a.x+a.w && y>=a.y && y<a.y+a.h) || null;
+}
+function exploreTileInfo(x,y){
+  const m = explore.map, t = mapTerrain(m,x,y), h = mapHeight(m,x,y), a = exploreArenaAt(x,y);
+  return `(${x},${y}) ${t.name}・高度${h}級・` + (t.passable ? `移動消耗${t.cost}` : '無法通行') + (a ? `・戰鬥範圍：${a.label}` : '');
+}
+function initExplore(zid){
+  const m = getZoneMap(zid);
+  if(!m.ok){ toast('探索區域資料有誤，請看console'); console.error('[zone]', m.errors); return false; }
+  const ch = state.party.find(p=>p.active) || unlockedCharacters()[0] || state.party[0];   // 隊長＝第一位上場角色
+  const leader = { id: ch.id, name: ch.name, side:'ally', hp:1, maxHp:1, x:m.start[0], y:m.start[1], _dx:m.start[0], _dy:m.start[1] };
+  const decor = [];
+  (m.arenas || []).forEach(a=> a.decor.forEach((d,i)=> decor.push({ arenaId:a.id, id:`decor_${a.id}_${i}`, portraitKey:d.portraitKey, name:d.name, side:'enemy', hp:1, maxHp:1, x:d.x, y:d.y, _dx:d.x, _dy:d.y })));
+  explore = { patrols:[], alertQueue:[], lastTile:null, cleared:{}, locked:false, triggered:null, prevPos:null, zoneId:zid, map:m, leader, decor, path:[], nextStepAt:0, reach:null, reachAt:'', lastStepAt:-1e9, walkT0:0, wasMoving:false, followTarget:null, followDirty:false };
+  patrolInit(explore, EXPLORE_ZONES[zid]);
+  exploreBuildFollowers();
+  return true;
+}
+/* v0.50-b8：探索畫面單位「走很遠」時（戰後走回）沿地形路徑走，一格一格；一般走一步（距離≤1）直接略過，不多算 */
+function exploreVisualPath(u, fx, fy, tx, ty){
+  if(!explore || Math.abs(fx-tx) + Math.abs(fy-ty) <= 1) return null;
+  const m = explore.map;
+  const r = mapDijkstra(m, [[fx, fy, 0]], { step:(ax,ay,bx,by)=> mapStepCost(m,'walk',ax,ay,bx,by) });
+  if(!(r.dist[ty*r.cols+tx] < Infinity)) return null;
+  return pathFromPrev(r, tx, ty);
+}
+function exploreHoverPath(x,y){
+  if(!explore || !mapIn(explore.map,x,y)) return null;
+  const r = exploreReach(), k = y*r.cols+x;
+  if(!(r.dist[k] > 0 && r.dist[k] < Infinity)) return null;
+  return pathFromPrev(r, x, y).slice(1);
+}
+/* 每幀決定畫哪條路線：正在走（含跟隨模式）＝只畫前方剩餘路徑；按住但還沒路徑＝不畫；閒置＝畫滑鼠懸停預覽（從目前位置重算） */
+function exploreRoute(hoverTile){
+  const ex = explore; if(!ex) return null;
+  if(ex.path.length) return ex.path;
+  if(ex.followTarget) return null;
+  return hoverTile ? exploreHoverPath(hoverTile.x, hoverTile.y) : null;
+}
+function exploreWalkTo(x,y){
+  const ex = explore; if(!ex || !mapIn(ex.map,x,y)) return false;
+  const r = exploreReach(), k = y*r.cols+x;
+  if(!(r.dist[k] < Infinity)){ toast(exploreTileInfo(x,y) + '・走不到'); return false; }
+  const path = pathFromPrev(r, x, y).slice(1);
+  if(!path.length){ toast(exploreTileInfo(x,y)); return false; }   // 點自己腳下＝看地形資訊
+  ex.path = path; ex.nextStepAt = 0;
+  return true;
+}
+function exploreTap(unit, tile){
+  if(!explore || !tile || explore.locked || explore.menuLock) return;
+  exploreWalkTo(tile.x, tile.y);
+}
+/* ---------- 走路動畫選圖 ---------- */
+const __walkBad = {}, __walkPre = {};
+function exploreIsMoving(){
+  const ex = explore, now = performance.now();
+  const m = ex.path.length > 0 || (now - ex.lastStepAt) < EXPLORE_WALK_STEP_MS * 1.6;
+  if(m && !ex.wasMoving) ex.walkT0 = now;
+  ex.wasMoving = m;
+  return m;
+}
+function walkFramePath(cfg, f){ return IDLE_ANIM_DIR + cfg.set + String(f).padStart(2,'0') + IDLE_ANIM_EXT; }
+function walkPreload(key, cfg){
+  if(__walkPre[key]) return; __walkPre[key] = true;
+  for(let f=0; f<cfg.frames; f++){ const im = new Image(); im.onerror = ()=>{ __walkBad[key] = true; }; im.src = walkFramePath(cfg, f); }
+}
+function exploreSpriteSrc(u){
+  const ex = explore;
+  if(ex && (u === ex.leader || u.follower)){
+    const cfg = EXPLORE_WALK_ANIMS[u.id];
+    if(cfg){
+      walkPreload(u.id, cfg);
+      if(!__walkBad[u.id] && exploreIsMoving()){
+        const f = Math.floor((performance.now() - ex.walkT0) / EXPLORE_WALK_FRAME_MS) % cfg.frames;
+        u._walkSrc = true; return walkFramePath(cfg, f);
+      }
+    }
+  }
+  u._walkSrc = false;
+  return stageSpriteSrc(u);
+}
+function exploreBadSprite(u){ if(u._walkSrc) __walkBad[u.id] = true; else idleMarkBad(u); }
+
+/* ---------- 按住左鍵＝跟隨模式：隊長持續往滑鼠所在的格子走，放開就停 ---------- */
+function exploreHold(tile, released){
+  const ex = explore; if(!ex || ex.locked || ex.menuLock) return;
+  if(released){ ex.followTarget = null; ex.path = []; return; }
+  if(!tile || !mapIn(ex.map, tile.x, tile.y)) return;   // 滑鼠移出地面：維持上一個目標
+  if(!ex.followTarget || ex.followTarget.x !== tile.x || ex.followTarget.y !== tile.y){ ex.followTarget = { x:tile.x, y:tile.y }; ex.followDirty = true; }
+}
+function exploreTick(){
+  const ex = explore; if(!ex || ex.locked || ex.menuLock) return;
+  explorePatrolTick(ex);          // v0.50-b5：巡邏隊移動＋警戒判斷
+  if(ex.locked) return;
+  if(ex.followTarget && (ex.followDirty || !ex.path.length)){
+    ex.followDirty = false;
+    const T = ex.followTarget;
+    if(!(T.x === ex.leader.x && T.y === ex.leader.y)){
+      const r = exploreReach(), k = T.y*r.cols + T.x;
+      ex.path = (r.dist[k] < Infinity) ? pathFromPrev(r, T.x, T.y).slice(1) : [];
+    }
+  }
+  if(!ex.path.length) return;
+  const now = performance.now(); if(now < ex.nextStepAt) return;
+  const [nx, ny] = ex.path.shift(), px = ex.leader.x, py = ex.leader.y;
+  ex.leader.x = ex.leader._dx = nx; ex.leader.y = ex.leader._dy = ny;
+  ex.nextStepAt = now + EXPLORE_WALK_STEP_MS; ex.lastStepAt = now; ex.lastTile = [px, py];
+  exploreFollowersStep(px, py, nx, ny);
+  if(EXPLORE_STEP_SFX){ ex.footB = !ex.footB; playCue(ex.footB && (SFX_FILES.stepB || !SFX_FILES.step) ? 'stepB' : 'step', EXPLORE_STEP_VOL); }
+  updateExploreHud();
+  const ar = exploreTriggerAt(nx, ny);
+  if(ar && !ex.cleared[ar.id]) exploreTrigger(ar, [px, py], [nx, ny]);   // 踩進戰鬥範圍＝觸發（不需要碰到敵人）
+  else explorePatrolCheck(ex);   // v0.50-b5：走進巡邏隊的警戒範圍
+}
+/* ---------- 觸發戰鬥：「！」停頓 → 存下戰前狀態 → 開戰；結束後 exploreBattleEnded 還原並回到探索 ---------- */
+const EXPLORE_TEST = { auto:false, roundCap:undefined };   // 測試用：true＝觸發的戰鬥由AI自動打完（跳過演出）
+function exploreTrigger(a, prev, entry){
+  const ex = explore; if(ex.locked) return;
+  ex.locked = true; ex.path = []; ex.followTarget = null; ex.triggered = a; ex.prevPos = prev; ex.entry = { x:entry[0], y:entry[1], dx:entry[0]-prev[0], dy:entry[1]-prev[1] };
+  const al = document.getElementById('exploreAlert');
+  if(al){ al.classList.remove('show'); void al.offsetWidth; al.classList.add('show'); }
+  playCue('alert');
+  if(typeof B3D !== 'undefined' && B3D.ok) ex.camDist = B3D.camState.dist;   // 戰後飛回來時沿用這個縮放
+  { // 鏡頭同時平移到戰鬥範圍中心（動態戰場：此刻雙方位置已定，先算好範圍，開戰時沿用）
+    if(a.dynamic) a.dyn = dynamicArena(ex, a.patrol);
+    const ar = a.dynamic ? a.dyn.arena : a;
+    if(typeof B3D !== 'undefined' && B3D.ok) B3D.panTo(ar.x + ar.w/2, ar.y + ar.h/2, Math.max(ar.w, ar.h), EXPLORE_PAN_MS);
+  }
+  setTimeout(()=>exploreStartBattle(a), EXPLORE_ALERT_MS);
+}
+function exploreStartBattle(a){
+  const ex = explore; if(!ex || ex.triggered !== a) return;
+  const al = document.getElementById('exploreAlert'); if(al) al.classList.remove('show');
+  ex.snap = JSON.stringify(state.party);   // 戰前隊伍狀態：逃跑／戰敗時整份還原
+  const exUnits = { allies:{}, enemies: a.dynamic ? a.patrol.units : ex.decor.filter(d=>d.arenaId === a.id) };
+  [ex.leader].concat(ex.followers || []).forEach(u=>{ exUnits.allies[u.id] = u; });
+  const opts = { exploreUnits:exUnits, fromExplore:true, entry:ex.entry, leaderId:ex.leader.id, arena:{ x:a.x, y:a.y, w:a.w, h:a.h }, zoneMap:ex.map };
+  if(a.dynamic){ const dy = a.dyn || dynamicArena(ex, a.patrol); opts.arena = dy.arena; opts.entry = dy.entry; opts.enemyEntry = dy.enemyEntry; ex.entry = dy.entry; }   // v0.50-b5：動態戰場
+  if(EXPLORE_TEST.auto || EXPLORE_TEST.manual) Object.assign(opts, { test:true, auto:!EXPLORE_TEST.manual, roundCap:EXPLORE_TEST.roundCap, onEnd:r=>exploreBattleEnded(r.result) });   // manual＝跳過演出但我方手動（測逃跑格用）
+  if(!startBattle(a.battle, null, opts)){
+    // 開不了戰（沒人上場／地圖不合格）：退回觸發前位置
+    ex.leader.x = ex.leader._dx = ex.prevPos[0]; ex.leader.y = ex.leader._dy = ex.prevPos[1];
+    ex.triggered = null; ex.locked = false; ex.reach = null; ex.reachAt = '';
+    B3D.setExplore({ radius:EXPLORE_VIEW_RADIUS, dim:EXPLORE_DIM_WIDTH, dark:EXPLORE_DIM_DARK, out:EXPLORE_FOG_OUT, maxDist:EXPLORE_ZOOM_MAX, follow:ex.leader, flip:EXPLORE_WALK_FLIP });
+  }
+}
+function exploreBattleEnded(result){
+  const ex = explore;
+  if(battle) battle.left = true;
+  if(!ex || !ex.triggered){ switchView('prep'); return; }
+  const a = ex.triggered; ex.triggered = null;
+  if(!result) result = battle.enemies.every(u=>u.hp<=0) ? 'win' : battle.allies.every(u=>u.hp<=0) ? 'lose' : 'flee';
+  if(result === 'win'){
+    if(!a.repeat){ ex.cleared[a.id] = true; ex.decor = ex.decor.filter(d=>d.arenaId !== a.id); }   // 一次性：敵人不再重生
+  } else if(ex.snap){
+    // 逃跑／戰敗／膠著：隊伍狀態還原成開戰前，沒有任何懲罰
+    JSON.parse(ex.snap).forEach(sp=>{ const p = state.party.find(q=>q.id === sp.id); if(p) Object.assign(p, sp); });
+  }
+  if(a.dynamic){
+    if(result === 'win') patrolSpawn(ex, a.patrol);   // 打贏：這支隊伍死光了，在別處重生（無限重生）
+    else {   // 逃跑／戰敗：巡邏隊恢復原狀（位置沒動），冷卻期間不巡邏、不觸發
+      const until = performance.now() + EXPLORE_RETURN_MS + PATROL_COOLDOWN_MS;
+      a.patrol.coolUntil = until; a.patrol.nextAt = until;
+      ex.alertQueue = ex.alertQueue.filter(q=>q!==a.patrol);
+    }
+  }
+  // v0.50-b8：打贏（且不是會重複觸發的固定戰場）隊長留在戰鬥結束時站的位置；逃跑／戰敗／重複戰場走回觸發前那一格（走路，不瞬移）
+  const lu = battle && battle.allies.find(u=>u.id === ex.leader.id);
+  const stay = result === 'win' && (a.dynamic || !a.repeat) && lu && lu.hp > 0;
+  const dest = stay ? [lu.x, lu.y] : ex.prevPos;
+  ex.leader.x = ex.leader._dx = dest[0]; ex.leader.y = ex.leader._dy = dest[1];
+  ex.lastTile = null;
+  exploreBuildFollowers();   // v0.50-b6：戰後隊友重新排在隊長身後（還原隊伍狀態之後才建）
+  { // v0.50-b8：探索單位接手戰鬥單位的畫面位置，從戰場上的位置「走」回去（包含逃跑／戰敗後恢復原位的巡邏隊）
+    const bAl = {}; ((battle && battle.allies) || []).forEach(u=>{ bAl[u.id] = u; });
+    const tr = (dst, src)=>{ if(dst && src && src._v){ dst._v = src._v; dst._faceRight = src._faceRight; dst._capWalk = true; } };
+    tr(ex.leader, bAl[ex.leader.id]); (ex.followers || []).forEach(f=> tr(f, bAl[f.id]));
+    if(a.dynamic && result !== 'win' && battle) a.patrol.units.forEach((u,i)=> tr(u, battle.enemies[i]));
+  }
+  ex.locked = false; ex.reach = null; ex.reachAt = ''; ex.path = [];
+  if(EXPLORE_RETURN_MS > 0){ ex.returning = true; ex.locked = true; setTimeout(()=>{ if(explore === ex && !ex.triggered) ex.locked = false; }, EXPLORE_RETURN_MS + 60); }   // v0.50-b7：鏡頭飛回期間鎖操作
+  ex.lastResult = result;
+  closeBattleOverlays && closeBattleOverlays();
+  setNavLocked(false);
+  switchView('explore');
+}
+function updateExploreHud(){
+  const el = document.getElementById('exploreHud'); if(!el || !explore) return;
+  const L = explore.leader, a = exploreArenaAt(L.x, L.y);
+  el.innerHTML = `<b>${EXPLORE_ZONES[explore.zoneId].name}</b> <span>${EXPLORE_ZONES[explore.zoneId].titleEn}</span><br>`
+    + `位置 (${L.x},${L.y})${a ? ' · 戰鬥範圍：'+a.label : ''}<br>`
+    + (explore.patrols||[]).map(p=>`巡邏隊「${p.proto[0].name}」隊長 (${p.hist[0][0]},${p.hist[0][1]}) · 距離 ${cheb(L.x,L.y,p.hist[0][0],p.hist[0][1])}（警戒範圍 ${p.alert}，距離≤${p.alert+1}開戰）<br>`).join('')
+    + `<span class="dim">點地面移動 · 按住左鍵持續跟隨 · Q/E 轉向 · 滾輪縮放 · 清楚視野 ${EXPLORE_VIEW_RADIUS*2+1}×${EXPLORE_VIEW_RADIUS*2+1}</span>`;
+}
+/* ---------- 角落小按鈕：整備／回顧 疊在探索畫面上（戰鬥外都能開；Esc 或右上角「關閉」收起） ---------- */
+let overlayView = null;
+function exploreRefreshLeader(){
+  const ex = explore; if(!ex) return;
+  const ch = state.party.find(p=>p.active) || unlockedCharacters()[0];
+  if(ch && ch.id !== ex.leader.id){ ex.leader.id = ch.id; ex.leader.name = ch.name; }   // 整備後第一位上場角色換人＝隊長換人
+  exploreBuildFollowers(); exploreSyncUnits();   // v0.50-b6：上場名單可能變了，隊友重排
+}
+function openViewOverlay(kind){
+  if(overlayView) closeViewOverlay();
+  if(explore && (explore.locked || explore.triggered)) return;       // 觸發戰鬥的演出中不開
+  const el = document.getElementById(kind === 'prep' ? 'viewPrep' : 'viewCodex');
+  el.style.display = ''; el.classList.add('view-overlay');
+  overlayView = kind;
+  if(explore){ explore.menuLock = true; explore.path = []; explore.followTarget = null; }
+  if(kind === 'prep'){ advancePrepBg(); renderPrep(); } else renderCodex();
+  let cb = document.getElementById('overlayClose');
+  if(!cb){ cb = document.createElement('button'); cb.id = 'overlayClose'; cb.className = 'btn primary overlay-close'; cb.textContent = '✕ 關閉'; cb.onclick = ()=> closeViewOverlay(); document.body.appendChild(cb); }
+  cb.style.display = '';
+}
+function closeViewOverlay(){
+  if(!overlayView) return;
+  const el = document.getElementById(overlayView === 'prep' ? 'viewPrep' : 'viewCodex');
+  el.classList.remove('view-overlay'); el.style.display = 'none';
+  overlayView = null;
+  const cb = document.getElementById('overlayClose'); if(cb) cb.style.display = 'none';
+  if(explore){ explore.menuLock = false; exploreRefreshLeader(); updateExploreHud(); }
+}
+window.addEventListener('keydown', e=>{ if(e.key === 'Escape' && overlayView) closeViewOverlay(); });
+function enterExplore(){
+  const el = document.getElementById('viewExplore');
+  if(!el.firstChild){
+    el.innerHTML = `<div class="explore-wrap"><div class="explore-host" id="exploreHost"></div><div class="explore-hud" id="exploreHud"></div><select class="explore-zone" id="exploreZoneSel" title="切換測試區域"></select><div class="explore-alert" id="exploreAlert">!</div><button class="battle-icon icon-prep" id="btnExPrep" title="整備">🎒</button><button class="battle-icon icon-codex" id="btnExCodex" title="回顧">📖</button></div>`;
+    document.getElementById('btnExPrep').onclick = ()=> openViewOverlay('prep');
+    document.getElementById('btnExCodex').onclick = ()=> openViewOverlay('codex');
+    const sel = document.getElementById('exploreZoneSel');
+    sel.innerHTML = Object.keys(EXPLORE_ZONES).map(k=>`<option value="${k}">${EXPLORE_ZONES[k].name}</option>`).join('');
+    sel.onchange = ()=>{ if(initExplore(sel.value)) enterExplore(); else sel.value = explore ? explore.zoneId : EXPLORE_DEFAULT_ZONE; };
+  }
+  if(!explore && !initExplore(EXPLORE_DEFAULT_ZONE)) return;
+  document.getElementById('exploreZoneSel').value = explore.zoneId;
+  const ex = explore;
+  B3D.mount(document.getElementById('exploreHost'));
+  if(!B3D.ok) toast('此裝置不支援WebGL，無法顯示3D地圖');
+  if(B3D.curMap() !== ex.map) B3D.loadMap(ex.map);
+  B3D.setExplore({ radius:EXPLORE_VIEW_RADIUS, dim:EXPLORE_DIM_WIDTH, dark:EXPLORE_DIM_DARK, out:EXPLORE_FOG_OUT, maxDist:EXPLORE_ZOOM_MAX, follow:ex.leader, flip:EXPLORE_WALK_FLIP });
+  B3D.setScene({
+    units: exploreAllUnits(), actor: ex.leader, yellow:[], move:[], red:[], redUnits:[], floorItems:[], effects:[],
+    rects: exploreRects(),
+    hoverPathFn: exploreHoverPath, routeFn: exploreRoute, routeCol: EXPLORE_ROUTE_COLOR, spriteSrc: exploreSpriteSrc, onBadSprite: exploreBadSprite, pathFn: exploreVisualPath,
+  });
+  B3D.setTags([]);
+  B3D.onTap(exploreTap);
+  B3D.onHold(exploreHold);
+  if(ex.returning && B3D.ok){   // v0.50-b7：戰後從戰場平順飛回隊長（鏡頭保持戰場最後的位置，不瞬移）
+    ex.returning = false;
+    B3D.setExplore({ radius:EXPLORE_VIEW_RADIUS, dim:EXPLORE_DIM_WIDTH, dark:EXPLORE_DIM_DARK, out:EXPLORE_FOG_OUT, maxDist:EXPLORE_ZOOM_MAX, follow:null, flip:EXPLORE_WALK_FLIP });
+    B3D.returnTo(ex.leader.x, ex.leader.y, ex.camDist || EXPLORE_DEFAULT_DIST, EXPLORE_RETURN_MS, ex.leader);
+  } else B3D.focus(ex.leader.x, ex.leader.y, EXPLORE_DEFAULT_DIST);
+  playBgm(BGM_TABLE.explore);
+  B3D.run();
+  updateExploreHud();
+  if(!exploreTimer) exploreTimer = setInterval(exploreTick, 30);
+}
+function leaveExplore(){
+  if(exploreTimer){ clearInterval(exploreTimer); exploreTimer = null; }
+  if(explore) explore.path = [];
+}
+
+
 /* ============================================================
    【v0.48】自動測試入口（只有網址帶 ?test 才會開放，一般遊玩不受影響）
    window.__SRPG.runAuto('goblin_patrol',{roundCap:60}) → Promise，我方也由AI操控，跑到分出勝負/膠著為止。
 ============================================================ */
 if(/[?&]test(=|&|$)/.test(location.search)){
   window.__SRPG = {
-    get battle(){ return battle; }, get state(){ return state; }, B3D, validateAllMaps, BATTLE_MAPS, BATTLES, ENEMY_TEMPLATES, TERRAIN_DB, getBattleMap, validateMapDef, parseMapDef,
+    get battle(){ return battle; }, get state(){ return state; }, get explore(){ return explore; }, EXPLORE_TEST, commitMovePreview,  exploreBattleEnded, validateAllZones, getZoneMap, enterExplore, exploreWalkTo, exploreTick, explorePatrolTick, dynamicArena, patrolSpawn, startBattle, stageTap, currentActor, renderGrid, computeValidCells, B3D, validateAllMaps, BATTLE_MAPS, BATTLES, ENEMY_TEMPLATES, TERRAIN_DB, getBattleMap, validateMapDef, parseMapDef,
     runAuto(key, o){ return new Promise(res=>{ const ok = startBattle(key, null, Object.assign({}, o, { test:true, auto:true, onEnd:res })); if(!ok) res({ result:'error', key }); }); },
   };
 }
